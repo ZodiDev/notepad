@@ -836,17 +836,18 @@
         function confirmDelete() {
             if (!swipeNoteId) return;
             
+            // Remove the note from array
             notes = notes.filter(note => note.id !== swipeNoteId);
             saveNotes();
             
-            // If deleting current note, close editor
+            // If deleting current note in editor, close editor
             if (currentNote && currentNote.id === swipeNoteId) {
                 currentNote = null;
                 closeEditor();
             }
             
-            swipeNoteId = null;
-            closeModal();
+            // Close modal without animation since we're deleting
+            closeModal(true);
             renderNotesList();
         }
 
@@ -1181,15 +1182,24 @@
             }
         }
 
-        function closeModal() {
-            document.getElementById('deleteModal').classList.remove('show');
+        function closeModal(skipAnimation = false) {
+            const modal = document.getElementById('deleteModal');
+            modal.classList.remove('show');
             
-            // Reset any swiped note position
-            if (swipeNoteId) {
+            // Reset any swiped note position when canceling (but not when confirming delete)
+            if (swipeNoteId && !skipAnimation) {
                 const noteItem = document.querySelector(`[data-note-id="${swipeNoteId}"] .note-item`);
                 if (noteItem) {
-                    noteItem.style.transition = 'transform 0.2s ease-out';
+                    // Force the transition and reset position
+                    noteItem.style.transition = 'transform 0.3s ease-out';
                     noteItem.style.transform = 'translateX(0)';
+                    
+                    // Clear the transition after animation completes
+                    setTimeout(() => {
+                        if (noteItem) {
+                            noteItem.style.transition = '';
+                        }
+                    }, 300);
                 }
             }
             
