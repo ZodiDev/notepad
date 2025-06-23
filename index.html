@@ -203,7 +203,7 @@
             flex-shrink: 0;
         }
 
-        .pin-icon, .archive-icon {
+        .pin-icon {
             font-size: 16px;
             color: var(--text-secondary);
         }
@@ -573,7 +573,6 @@
                 <div class="filter-buttons">
                     <button class="filter-btn active" onclick="filterNotes('all')">All</button>
                     <button class="filter-btn" onclick="filterNotes('pinned')">Pinned</button>
-                    <button class="filter-btn" onclick="filterNotes('archived')">Archived</button>
                 </div>
             </div>
             <div class="notes-list" id="notesList"></div>
@@ -586,7 +585,6 @@
                 <input type="text" class="editor-title" id="noteTitle" placeholder="Untitled Note">
                 <div class="editor-actions">
                     <button class="action-btn" id="pinBtn" onclick="togglePin()">📌</button>
-                    <button class="action-btn" onclick="toggleArchive()">📥</button>
                     <button class="action-btn" onclick="exportNote()">📤</button>
                     <button class="action-btn" onclick="deleteNote()">🗑️</button>
                 </div>
@@ -678,8 +676,7 @@
                     content: 'This is your new notes app. You can create, edit, and organize your thoughts here. Features: • Two-column layout • Search and filter • Pin important notes • Swipe to delete (try it!)',
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
-                    isPinned: false,
-                    isArchived: false
+                    isPinned: false
                 },
                 {
                     id: generateId(),
@@ -687,8 +684,7 @@
                     content: 'Random thoughts and ideas: 1. Learn a new language 2. Start a garden 3. Write a blog 4. Travel to Japan',
                     createdAt: new Date(Date.now() - 3600000).toISOString(),
                     updatedAt: new Date(Date.now() - 3600000).toISOString(),
-                    isPinned: true,
-                    isArchived: false
+                    isPinned: true
                 },
                 {
                     id: generateId(),
@@ -696,8 +692,7 @@
                     content: 'Project kickoff meeting • Discussed timeline • Assigned roles • Set deadlines Next meeting: Friday...',
                     createdAt: new Date(Date.now() - 39600000).toISOString(),
                     updatedAt: new Date(Date.now() - 39600000).toISOString(),
-                    isPinned: false,
-                    isArchived: false
+                    isPinned: false
                 },
                 {
                     id: generateId(),
@@ -705,8 +700,7 @@
                     content: 'Milk Bread Eggs x Coffee Apples Pasta',
                     createdAt: new Date(Date.now() - 61200000).toISOString(),
                     updatedAt: new Date(Date.now() - 61200000).toISOString(),
-                    isPinned: false,
-                    isArchived: false
+                    isPinned: false
                 }
             ];
             
@@ -734,8 +728,7 @@
                 content: '',
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
-                isPinned: false,
-                isArchived: false
+                isPinned: false
             };
             
             notes.unshift(newNote);
@@ -824,8 +817,6 @@
 
         function deleteNote() {
             if (!currentNote) return;
-            
-            console.log('Delete button clicked for note:', currentNote.id);
             swipeNoteId = currentNote.id;
             document.getElementById('deleteModal').classList.add('show');
         }
@@ -836,17 +827,11 @@
         }
 
         function confirmDelete() {
-            console.log('Confirm delete called for note:', swipeNoteId);
-            
-            if (!swipeNoteId) {
-                console.log('No swipeNoteId found');
-                return;
-            }
+            if (!swipeNoteId) return;
             
             // Remove the note from array
             notes = notes.filter(note => note.id !== swipeNoteId);
             saveNotes();
-            console.log('Note deleted, remaining notes:', notes.length);
             
             // If deleting current note in editor, close editor
             if (currentNote && currentNote.id === swipeNoteId) {
@@ -1073,11 +1058,8 @@
             // Apply filter
             if (filterType === 'pinned') {
                 filteredNotes = filteredNotes.filter(note => note.isPinned);
-            } else if (filterType === 'archived') {
-                filteredNotes = filteredNotes.filter(note => note.isArchived);
-            } else {
-                filteredNotes = filteredNotes.filter(note => !note.isArchived);
             }
+            // 'all' shows all notes - no filtering needed
             
             // Apply search
             if (searchTerm) {
@@ -1123,7 +1105,6 @@
                             <div class="note-item-title">${note.title}</div>
                             <div class="note-item-icons">
                                 ${note.isPinned ? '<span class="pin-icon pinned">📌</span>' : ''}
-                                ${note.isArchived ? '<span class="archive-icon">📥</span>' : ''}
                             </div>
                         </div>
                         <div class="note-item-preview">${preview}${note.content.length > 100 ? '...' : ''}</div>
@@ -1216,22 +1197,17 @@
         }
 
         function closeModal() {
-            console.log('Close modal called for note:', swipeNoteId);
-            
             const modal = document.getElementById('deleteModal');
             modal.classList.remove('show');
             
             // Reset any swiped note position when canceling
             if (swipeNoteId) {
                 const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
-                console.log('Found note container:', !!noteContainer);
                 
                 if (noteContainer) {
                     const noteItem = noteContainer.querySelector('.note-item');
-                    console.log('Found note item:', !!noteItem);
                     
                     if (noteItem) {
-                        console.log('Resetting note position...');
                         // Force reset position with animation
                         noteItem.style.transition = 'transform 0.3s ease-out';
                         noteItem.style.transform = 'translateX(0px)';
@@ -1240,7 +1216,6 @@
                         setTimeout(() => {
                             if (noteItem) {
                                 noteItem.style.transition = '';
-                                console.log('Animation complete, transition cleared');
                             }
                         }, 350);
                     }
