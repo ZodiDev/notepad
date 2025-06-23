@@ -824,6 +824,8 @@
 
         function deleteNote() {
             if (!currentNote) return;
+            
+            console.log('Delete button clicked for note:', currentNote.id);
             swipeNoteId = currentNote.id;
             document.getElementById('deleteModal').classList.add('show');
         }
@@ -834,11 +836,17 @@
         }
 
         function confirmDelete() {
-            if (!swipeNoteId) return;
+            console.log('Confirm delete called for note:', swipeNoteId);
+            
+            if (!swipeNoteId) {
+                console.log('No swipeNoteId found');
+                return;
+            }
             
             // Remove the note from array
             notes = notes.filter(note => note.id !== swipeNoteId);
             saveNotes();
+            console.log('Note deleted, remaining notes:', notes.length);
             
             // If deleting current note in editor, close editor
             if (currentNote && currentNote.id === swipeNoteId) {
@@ -846,8 +854,12 @@
                 closeEditor();
             }
             
-            // Close modal without animation since we're deleting
-            closeModal(true);
+            // Close modal and reset
+            const modal = document.getElementById('deleteModal');
+            modal.classList.remove('show');
+            swipeNoteId = null;
+            
+            // Re-render the list
             renderNotesList();
         }
 
@@ -906,7 +918,9 @@
             // Only allow left swipe, but be more forgiving
             if (deltaX > 0) {
                 const swipeDistance = Math.min(deltaX, maxSwipeDistance);
-                const noteItem = document.querySelector(`[data-note-id="${swipeNoteId}"] .note-item`);
+                const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
+                const noteItem = noteContainer ? noteContainer.querySelector('.note-item') : null;
+                
                 if (noteItem) {
                     noteItem.style.transform = `translateX(-${swipeDistance}px)`;
                     
@@ -922,39 +936,58 @@
             if (!isSwipeActive) return;
             
             const deltaX = startX - currentX;
-            const noteItem = document.querySelector(`[data-note-id="${swipeNoteId}"] .note-item`);
+            const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
+            const noteItem = noteContainer ? noteContainer.querySelector('.note-item') : null;
             
             if (noteItem) {
                 noteItem.classList.remove('swiping');
                 
                 if (deltaX > swipeThreshold) {
-                    // Swipe threshold reached - trigger delete with smooth animation
+                    // Swipe threshold reached - trigger delete with animation
                     noteItem.style.transition = 'transform 0.2s ease-out';
                     noteItem.style.transform = `translateX(-${maxSwipeDistance}px)`;
                     
-                    // Delay delete modal slightly for smooth UX
+                    // Show delete modal after animation
                     setTimeout(() => {
                         deleteNoteById(swipeNoteId);
                     }, 100);
                 } else {
-                    // Reset position with smooth animation
+                    // Reset position immediately with smooth animation
                     noteItem.style.transition = 'transform 0.2s ease-out';
-                    noteItem.style.transform = 'translateX(0)';
+                    noteItem.style.transform = 'translateX(0px)';
+                    
+                    // Clear transition after animation
+                    setTimeout(() => {
+                        if (noteItem) {
+                            noteItem.style.transition = '';
+                        }
+                    }, 250);
                 }
             }
             
             isSwipeActive = false;
-            swipeNoteId = null;
+            if (deltaX <= swipeThreshold) {
+                swipeNoteId = null; // Only reset if we didn't trigger delete
+            }
         }
 
         function cancelSwipe() {
             if (!isSwipeActive) return;
             
-            const noteItem = document.querySelector(`[data-note-id="${swipeNoteId}"] .note-item`);
+            const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
+            const noteItem = noteContainer ? noteContainer.querySelector('.note-item') : null;
+            
             if (noteItem) {
                 noteItem.classList.remove('swiping');
                 noteItem.style.transition = 'transform 0.2s ease-out';
-                noteItem.style.transform = 'translateX(0)';
+                noteItem.style.transform = 'translateX(0px)';
+                
+                // Clear transition after animation
+                setTimeout(() => {
+                    if (noteItem) {
+                        noteItem.style.transition = '';
+                    }
+                }, 250);
             }
             
             isSwipeActive = false;
@@ -1182,24 +1215,35 @@
             }
         }
 
-        function closeModal(skipAnimation = false) {
+        function closeModal() {
+            console.log('Close modal called for note:', swipeNoteId);
+            
             const modal = document.getElementById('deleteModal');
             modal.classList.remove('show');
             
-            // Reset any swiped note position when canceling (but not when confirming delete)
-            if (swipeNoteId && !skipAnimation) {
-                const noteItem = document.querySelector(`[data-note-id="${swipeNoteId}"] .note-item`);
-                if (noteItem) {
-                    // Force the transition and reset position
-                    noteItem.style.transition = 'transform 0.3s ease-out';
-                    noteItem.style.transform = 'translateX(0)';
+            // Reset any swiped note position when canceling
+            if (swipeNoteId) {
+                const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
+                console.log('Found note container:', !!noteContainer);
+                
+                if (noteContainer) {
+                    const noteItem = noteContainer.querySelector('.note-item');
+                    console.log('Found note item:', !!noteItem);
                     
-                    // Clear the transition after animation completes
-                    setTimeout(() => {
-                        if (noteItem) {
-                            noteItem.style.transition = '';
-                        }
-                    }, 300);
+                    if (noteItem) {
+                        console.log('Resetting note position...');
+                        // Force reset position with animation
+                        noteItem.style.transition = 'transform 0.3s ease-out';
+                        noteItem.style.transform = 'translateX(0px)';
+                        
+                        // Clear transition after animation
+                        setTimeout(() => {
+                            if (noteItem) {
+                                noteItem.style.transition = '';
+                                console.log('Animation complete, transition cleared');
+                            }
+                        }, 350);
+                    }
                 }
             }
             
