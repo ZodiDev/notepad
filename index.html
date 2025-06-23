@@ -940,11 +940,11 @@
                 // For demo purposes in Claude artifacts, we'll use memory storage
                 // For your GitHub Pages deployment, uncomment the localStorage lines below:
                 
-                // const savedNotes = localStorage.getItem('notes');
-                // if (savedNotes) {
-                //     notes = JSON.parse(savedNotes);
-                //     console.log('Notes loaded from localStorage');
-                // }
+                const savedNotes = localStorage.getItem('notes');
+                if (savedNotes) {
+                    notes = JSON.parse(savedNotes);
+                    console.log('Notes loaded from localStorage');
+                }
                 
                 console.log('Notes loaded from memory (localStorage will work on GitHub Pages)');
             } catch (e) {
