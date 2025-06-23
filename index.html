@@ -33,6 +33,10 @@
             line-height: 1.6;
             height: 100vh;
             overflow: hidden;
+            -webkit-user-select: none;
+            -moz-user-select: none;
+            -ms-user-select: none;
+            user-select: none;
         }
 
         .container {
@@ -119,27 +123,50 @@
             align-content: start;
         }
 
-        /* On very small screens, fall back to single column 
-        @media (max-width: 480px) {
-            .notes-list {
-                grid-template-columns: 1fr;
-            }
+        /* Swipe container for notes */
+        .note-swipe-container {
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
         }
-            */
+
+        .note-swipe-background {
+            position: absolute;
+            top: 0;
+            right: 0;
+            width: 100%;
+            height: 100%;
+            background-color: var(--danger);
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding-right: 20px;
+            color: white;
+            font-size: 18px;
+            z-index: 1;
+        }
 
         .note-item {
             background-color: var(--bg-secondary);
             border-radius: 10px;
             padding: 16px;
             cursor: pointer;
-            transition: all 0.2s;
+            transition: transform 0.3s ease;
             position: relative;
             display: flex;
             flex-direction: column;
             height: fit-content;
+            z-index: 2;
+            touch-action: pan-y;
+            width: 100%;
+            transform: translateX(0);
         }
 
-        .note-item:active {
+        .note-item.swiping {
+            transition: none;
+        }
+
+        .note-item:active:not(.swiping) {
             transform: scale(0.98);
         }
 
@@ -502,11 +529,35 @@
             -ms-overflow-style: none;
             scrollbar-width: none;
         }
+
+        /* Swipe hint text */
+        .swipe-hint {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 14px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        .swipe-hint.show {
+            opacity: 1;
+        }
     </style>
 </head>
 <body>
     <!-- Save Status Indicator -->
     <div class="save-status" id="saveStatus"></div>
+
+    <!-- Swipe Hint -->
+    <div class="swipe-hint" id="swipeHint">Swipe left to delete</div>
 
     <div class="container">
         <!-- Notes List -->
@@ -587,6 +638,15 @@
         let filterType = 'all';
         let autoSaveTimer = null;
         let saveStatusTimer = null;
+        let swipeNoteId = null;
+
+        // Swipe state
+        let isSwipeActive = false;
+        let startX = 0;
+        let startY = 0;
+        let currentX = 0;
+        let swipeThreshold = 100;
+        let maxSwipeDistance = 150;
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -601,8 +661,61 @@
             // Create some demo notes if none exist
             if (notes.length === 0) {
                 createDemoNotes();
+                showSwipeHint();
             }
         });
+
+        function createDemoNotes() {
+            const demoNotes = [
+                {
+                    id: generateId(),
+                    title: 'Welcome to Notes!',
+                    content: 'This is your new notes app. You can create, edit, and organize your thoughts here. Features: • Two-column layout • Search and filter • Pin important notes • Swipe to delete (try it!)',
+                    createdAt: new Date().toISOString(),
+                    updatedAt: new Date().toISOString(),
+                    isPinned: false,
+                    isArchived: false
+                },
+                {
+                    id: generateId(),
+                    title: 'Ideas',
+                    content: 'Random thoughts and ideas: 1. Learn a new language 2. Start a garden 3. Write a blog 4. Travel to Japan',
+                    createdAt: new Date(Date.now() - 3600000).toISOString(),
+                    updatedAt: new Date(Date.now() - 3600000).toISOString(),
+                    isPinned: true,
+                    isArchived: false
+                },
+                {
+                    id: generateId(),
+                    title: 'Meeting Notes',
+                    content: 'Project kickoff meeting • Discussed timeline • Assigned roles • Set deadlines Next meeting: Friday...',
+                    createdAt: new Date(Date.now() - 39600000).toISOString(),
+                    updatedAt: new Date(Date.now() - 39600000).toISOString(),
+                    isPinned: false,
+                    isArchived: false
+                },
+                {
+                    id: generateId(),
+                    title: 'Shopping List',
+                    content: 'Milk Bread Eggs x Coffee Apples Pasta',
+                    createdAt: new Date(Date.now() - 61200000).toISOString(),
+                    updatedAt: new Date(Date.now() - 61200000).toISOString(),
+                    isPinned: false,
+                    isArchived: false
+                }
+            ];
+            
+            notes = demoNotes;
+            saveNotes();
+        }
+
+        function showSwipeHint() {
+            const hint = document.getElementById('swipeHint');
+            hint.classList.add('show');
+            setTimeout(() => {
+                hint.classList.remove('show');
+            }, 3000);
+        }
 
         // Note Management Functions
         function generateId() {
@@ -706,17 +819,30 @@
 
         function deleteNote() {
             if (!currentNote) return;
+            swipeNoteId = currentNote.id;
+            document.getElementById('deleteModal').classList.add('show');
+        }
+
+        function deleteNoteById(noteId) {
+            swipeNoteId = noteId;
             document.getElementById('deleteModal').classList.add('show');
         }
 
         function confirmDelete() {
-            if (!currentNote) return;
+            if (!swipeNoteId) return;
             
-            notes = notes.filter(note => note.id !== currentNote.id);
+            notes = notes.filter(note => note.id !== swipeNoteId);
             saveNotes();
-            currentNote = null;
+            
+            // If deleting current note, close editor
+            if (currentNote && currentNote.id === swipeNoteId) {
+                currentNote = null;
+                closeEditor();
+            }
+            
+            swipeNoteId = null;
             closeModal();
-            closeEditor();
+            renderNotesList();
         }
 
         function exportNote() {
@@ -738,6 +864,90 @@
             a.click();
             document.body.removeChild(a);
             URL.revokeObjectURL(url);
+        }
+
+        // Swipe handling functions
+        function handleTouchStart(e, noteId) {
+            if (isSwipeActive) return;
+            
+            const touch = e.touches[0];
+            startX = touch.clientX;
+            startY = touch.clientY;
+            currentX = startX;
+            
+            const noteItem = e.currentTarget.querySelector('.note-item');
+            noteItem.classList.add('swiping');
+            
+            isSwipeActive = true;
+            swipeNoteId = noteId;
+        }
+
+        function handleTouchMove(e) {
+            if (!isSwipeActive) return;
+            
+            e.preventDefault();
+            const touch = e.touches[0];
+            currentX = touch.clientX;
+            const deltaX = startX - currentX;
+            const deltaY = Math.abs(touch.clientY - startY);
+            
+            // If vertical movement is too much, cancel swipe
+            if (deltaY > 50) {
+                cancelSwipe();
+                return;
+            }
+            
+            // Only allow left swipe
+            if (deltaX > 0) {
+                const swipeDistance = Math.min(deltaX, maxSwipeDistance);
+                const noteItem = document.querySelector(`[data-note-id="${swipeNoteId}"] .note-item`);
+                if (noteItem) {
+                    noteItem.style.transform = `translateX(-${swipeDistance}px)`;
+                }
+            }
+        }
+
+        function handleTouchEnd(e) {
+            if (!isSwipeActive) return;
+            
+            const deltaX = startX - currentX;
+            const noteItem = document.querySelector(`[data-note-id="${swipeNoteId}"] .note-item`);
+            
+            if (noteItem) {
+                noteItem.classList.remove('swiping');
+                
+                if (deltaX > swipeThreshold) {
+                    // Swipe threshold reached - trigger delete
+                    deleteNoteById(swipeNoteId);
+                }
+                
+                // Reset position
+                noteItem.style.transform = 'translateX(0)';
+            }
+            
+            isSwipeActive = false;
+            swipeNoteId = null;
+        }
+
+        function cancelSwipe() {
+            if (!isSwipeActive) return;
+            
+            const noteItem = document.querySelector(`[data-note-id="${swipeNoteId}"] .note-item`);
+            if (noteItem) {
+                noteItem.classList.remove('swiping');
+                noteItem.style.transform = 'translateX(0)';
+            }
+            
+            isSwipeActive = false;
+            swipeNoteId = null;
+        }
+
+        function handleNoteClick(e, noteId) {
+            if (isSwipeActive) {
+                e.preventDefault();
+                return;
+            }
+            selectNote(noteId);
         }
 
         // Text Formatting
@@ -846,26 +1056,36 @@
             }
             
             filteredNotes.forEach(note => {
-                const noteItem = document.createElement('div');
-                noteItem.className = `note-item ${note.isPinned ? 'pinned' : ''}`;
-                noteItem.dataset.noteId = note.id;
-                noteItem.onclick = () => selectNote(note.id);
+                const noteContainer = document.createElement('div');
+                noteContainer.className = 'note-swipe-container';
+                noteContainer.dataset.noteId = note.id;
                 
                 const preview = note.content.replace(/[*_#\[\]]/g, '').substring(0, 100);
                 
-                noteItem.innerHTML = `
-                    <div class="note-item-header">
-                        <div class="note-item-title">${note.title}</div>
-                        <div class="note-item-icons">
-                            ${note.isPinned ? '<span class="pin-icon pinned">📌</span>' : ''}
-                            ${note.isArchived ? '<span class="archive-icon">📥</span>' : ''}
-                        </div>
+                noteContainer.innerHTML = `
+                    <div class="note-swipe-background">
+                        🗑️
                     </div>
-                    <div class="note-item-preview">${preview}${note.content.length > 100 ? '...' : ''}</div>
-                    <div class="note-item-meta">${formatDate(note.updatedAt)}</div>
+                    <div class="note-item ${note.isPinned ? 'pinned' : ''}">
+                        <div class="note-item-header">
+                            <div class="note-item-title">${note.title}</div>
+                            <div class="note-item-icons">
+                                ${note.isPinned ? '<span class="pin-icon pinned">📌</span>' : ''}
+                                ${note.isArchived ? '<span class="archive-icon">📥</span>' : ''}
+                            </div>
+                        </div>
+                        <div class="note-item-preview">${preview}${note.content.length > 100 ? '...' : ''}</div>
+                        <div class="note-item-meta">${formatDate(note.updatedAt)}</div>
+                    </div>
                 `;
                 
-                notesList.appendChild(noteItem);
+                // Add touch event listeners
+                noteContainer.addEventListener('touchstart', (e) => handleTouchStart(e, note.id), { passive: false });
+                noteContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
+                noteContainer.addEventListener('touchend', handleTouchEnd, { passive: false });
+                noteContainer.addEventListener('click', (e) => handleNoteClick(e, note.id));
+                
+                notesList.appendChild(noteContainer);
             });
         }
 
@@ -912,21 +1132,15 @@
             return date.toLocaleDateString();
         }
 
-        // Storage Functions - ENHANCED with better error handling
+        // Storage Functions
         function saveNotes() {
             try {
-                // For demo purposes in Claude artifacts, we'll store in memory
-                // For your GitHub Pages deployment, uncomment the localStorage line below:
                 localStorage.setItem('notes', JSON.stringify(notes));
-                
-                // In this artifact demo, data won't persist between sessions
-                // but the saving functionality will work when deployed to GitHub Pages
-                console.log('Notes saved to memory (localStorage will work on GitHub Pages)');
+                console.log('Notes saved to localStorage');
                 return true;
             } catch (e) {
                 console.error('Failed to save notes:', e);
                 
-                // Try to handle quota exceeded error
                 if (e.name === 'QuotaExceededError') {
                     alert('Storage quota exceeded. Please delete some notes to free up space.');
                 } else {
@@ -938,16 +1152,11 @@
 
         function loadNotes() {
             try {
-                // For demo purposes in Claude artifacts, we'll use memory storage
-                // For your GitHub Pages deployment, uncomment the localStorage lines below:
-                
                 const savedNotes = localStorage.getItem('notes');
                 if (savedNotes) {
                     notes = JSON.parse(savedNotes);
                     console.log('Notes loaded from localStorage');
                 }
-                
-                console.log('Notes loaded from memory (localStorage will work on GitHub Pages)');
             } catch (e) {
                 console.error('Failed to load notes:', e);
                 notes = [];
@@ -956,6 +1165,7 @@
 
         function closeModal() {
             document.getElementById('deleteModal').classList.remove('show');
+            swipeNoteId = null;
         }
 
         // Handle clicks outside modal
@@ -979,6 +1189,13 @@
                 saveNotes();
             }
         });
+
+        // Prevent scrolling when swiping
+        document.addEventListener('touchmove', function(e) {
+            if (isSwipeActive) {
+                e.preventDefault();
+            }
+        }, { passive: false });
     </script>
 </body>
 </html>
