@@ -334,37 +334,6 @@
             color: var(--warning);
         }
 
-        .editor-toolbar {
-            padding: 12px 20px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            gap: 8px;
-            align-items: center;
-            background-color: var(--bg-primary);
-        }
-
-        .toolbar-btn {
-            background: var(--bg-secondary);
-            border: none;
-            padding: 8px 16px;
-            border-radius: 8px;
-            cursor: pointer;
-            color: var(--text-primary);
-            font-size: 15px;
-            transition: all 0.2s;
-        }
-
-        .toolbar-btn:active {
-            background-color: var(--bg-tertiary);
-        }
-
-        .toolbar-separator {
-            width: 1px;
-            height: 24px;
-            background-color: var(--border);
-            margin: 0 4px;
-        }
-
         .editor-content {
             flex: 1;
             padding: 20px;
@@ -380,9 +349,50 @@
             color: var(--text-primary);
             font-size: 17px;
             line-height: 1.6;
-            resize: none;
             font-family: inherit;
             outline: none;
+            -webkit-user-select: text;
+            -moz-user-select: text;
+            -ms-user-select: text;
+            user-select: text;
+        }
+
+        .editor-textarea:focus {
+            outline: none;
+        }
+
+        /* Formatting styles for the contenteditable editor */
+        .editor-textarea .bold {
+            font-weight: bold;
+        }
+
+        .editor-textarea .italic {
+            font-style: italic;
+        }
+
+        .editor-textarea .underline {
+            text-decoration: underline;
+        }
+
+        .editor-textarea .bold-italic {
+            font-weight: bold;
+            font-style: italic;
+        }
+
+        .editor-textarea .italic-underline {
+            font-style: italic;
+            text-decoration: underline;
+        }
+
+        .editor-textarea .bold-underline {
+            font-weight: bold;
+            text-decoration: underline;
+        }
+
+        .editor-textarea .bold-italic-underline {
+            font-weight: bold;
+            font-style: italic;
+            text-decoration: underline;
         }
 
         .editor-footer {
@@ -585,28 +595,26 @@
                 <input type="text" class="editor-title" id="noteTitle" placeholder="Untitled Note">
                 <div class="editor-actions">
                     <button class="action-btn" id="pinBtn" onclick="togglePin()">📌</button>
-                    <button class="action-btn" onclick="exportNote()">📤</button>
-                    <button class="action-btn" onclick="deleteNote()">🗑️</button>
                 </div>
             </div>
             
-            <div class="editor-toolbar">
-                <button class="toolbar-btn" onclick="formatText('bold')"><b>B</b></button>
-                <button class="toolbar-btn" onclick="formatText('italic')"><i>I</i></button>
-                <button class="toolbar-btn" onclick="formatText('underline')"><u>U</u></button>
-                <div class="toolbar-separator"></div>
-                <button class="toolbar-btn" onclick="insertList('ul')">• List</button>
-                <button class="toolbar-btn" onclick="insertList('ol')">1. List</button>
-                <div class="toolbar-separator"></div>
-                <button class="toolbar-btn" onclick="insertCheckbox()">☐ Task</button>
-            </div>
-            
             <div class="editor-content">
-                <textarea class="editor-textarea" id="noteContent" placeholder="Start typing..."></textarea>
+                <div class="editor-textarea" id="noteContent" contenteditable="true" 
+                     data-placeholder="Start typing... 
+
+Formatting happens when you press space or pause:
+*bold text* → bold text
+**italic text** → italic text  
+***bold italic*** → bold italic
+_underlined text_ → underlined text
+
+Combine them:
+_*bold + underlined*_
+_***all three***_"></div>
             </div>
             
             <div class="editor-footer">
-                <span id="lastSaved">Last saved: Never</span>
+                <span id="lastSaved">Auto-saved</span>
                 <span id="charCount">0 characters</span>
             </div>
         </div>
@@ -633,6 +641,24 @@
         </div>
     </div>
 
+    <style>
+        /* Placeholder styling for contenteditable */
+        .editor-textarea:empty:before {
+            content: attr(data-placeholder);
+            color: var(--text-secondary);
+            font-style: italic;
+            white-space: pre-wrap;
+        }
+        
+        .editor-textarea:focus:before {
+            opacity: 0.7;
+        }
+        
+        .editor-textarea:not(:empty):before {
+            display: none;
+        }
+    </style>
+
     <script>
         // State Management
         let notes = [];
@@ -642,13 +668,14 @@
         let autoSaveTimer = null;
         let saveStatusTimer = null;
         let swipeNoteId = null;
+        let isProcessingInput = false;
 
         // Swipe state
         let isSwipeActive = false;
         let startX = 0;
         let startY = 0;
         let currentX = 0;
-        let swipeThreshold = 60; // Reduced from 100 for easier swiping
+        let swipeThreshold = 60;
         let maxSwipeDistance = 120;
 
         // Initialize
@@ -659,7 +686,11 @@
             // Event listeners
             document.getElementById('searchBox').addEventListener('input', handleSearch);
             document.getElementById('noteTitle').addEventListener('input', handleTitleChange);
-            document.getElementById('noteContent').addEventListener('input', handleContentChange);
+            
+            const noteContent = document.getElementById('noteContent');
+            noteContent.addEventListener('input', handleContentChange);
+            noteContent.addEventListener('keydown', handleKeyDown);
+            noteContent.addEventListener('paste', handlePaste);
             
             // Create some demo notes if none exist
             if (notes.length === 0) {
@@ -673,7 +704,7 @@
                 {
                     id: generateId(),
                     title: 'Welcome to Notes!',
-                    content: 'This is your new notes app. You can create, edit, and organize your thoughts here. Features: • Two-column layout • Search and filter • Pin important notes • Swipe to delete (try it!)',
+                    content: 'This is your new notes app with automatic formatting!\n\nTry typing:\n*bold text* and press space\n**italic text** and press space\n***bold italic*** and press space\n_underlined text_ and press space\n\nCombine them:\n_*bold underlined*_\n_**italic underlined**_\n_***bold italic underlined***_',
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
                     isPinned: false
@@ -681,7 +712,7 @@
                 {
                     id: generateId(),
                     title: 'Ideas',
-                    content: 'Random thoughts and ideas: 1. Learn a new language 2. Start a garden 3. Write a blog 4. Travel to Japan',
+                    content: 'Random thoughts and ideas:\n1. Learn a new language\n2. Start a garden\n3. Write a blog\n4. Travel to Japan',
                     createdAt: new Date(Date.now() - 3600000).toISOString(),
                     updatedAt: new Date(Date.now() - 3600000).toISOString(),
                     isPinned: true
@@ -689,17 +720,9 @@
                 {
                     id: generateId(),
                     title: 'Meeting Notes',
-                    content: 'Project kickoff meeting • Discussed timeline • Assigned roles • Set deadlines Next meeting: Friday...',
+                    content: 'Project kickoff meeting\n• Discussed timeline\n• Assigned roles\n• Set deadlines\n\nNext meeting: Friday',
                     createdAt: new Date(Date.now() - 39600000).toISOString(),
                     updatedAt: new Date(Date.now() - 39600000).toISOString(),
-                    isPinned: false
-                },
-                {
-                    id: generateId(),
-                    title: 'Shopping List',
-                    content: 'Milk Bread Eggs x Coffee Apples Pasta',
-                    createdAt: new Date(Date.now() - 61200000).toISOString(),
-                    updatedAt: new Date(Date.now() - 61200000).toISOString(),
                     isPinned: false
                 }
             ];
@@ -752,11 +775,20 @@
             document.getElementById('fab').classList.add('hidden');
             
             document.getElementById('noteTitle').value = currentNote.title;
-            document.getElementById('noteContent').value = currentNote.content;
+            const noteContent = document.getElementById('noteContent');
+            noteContent.innerHTML = '';
+            
+            // Convert plain text to formatted HTML
+            const formattedContent = convertTextToFormattedHTML(currentNote.content);
+            noteContent.innerHTML = formattedContent;
+            
             document.getElementById('pinBtn').classList.toggle('active', currentNote.isPinned);
             
             updateCharCount();
             updateLastSaved();
+            
+            // Focus the editor
+            noteContent.focus();
         }
 
         function closeEditor() {
@@ -772,11 +804,163 @@
             autoSave();
         }
 
+        let formatTimer = null;
+
         function handleContentChange(e) {
-            if (!currentNote) return;
-            currentNote.content = e.target.value;
+            if (!currentNote || isProcessingInput) return;
+            
+            // Update the note content immediately with plain text
+            currentNote.content = getPlainText();
             updateCharCount();
             autoSave();
+        }
+
+        function handleKeyDown(e) {
+            // Handle Enter key for line breaks
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                document.execCommand('insertHTML', false, '<br><br>');
+                triggerDelayedFormatting();
+                return;
+            }
+            
+            // Handle Space - trigger formatting after space
+            if (e.key === ' ') {
+                setTimeout(() => triggerDelayedFormatting(), 50);
+                return;
+            }
+            
+            // Clear any pending formatting
+            clearTimeout(formatTimer);
+            
+            // Set a delayed formatting trigger
+            formatTimer = setTimeout(() => {
+                processFormatting();
+            }, 1500); // Only format after 1.5 seconds of no typing
+        }
+
+        function handlePaste(e) {
+            e.preventDefault();
+            const text = (e.originalEvent || e).clipboardData.getData('text/plain');
+            document.execCommand('insertText', false, text);
+            triggerDelayedFormatting();
+        }
+
+        function triggerDelayedFormatting() {
+            clearTimeout(formatTimer);
+            formatTimer = setTimeout(() => {
+                processFormatting();
+            }, 300);
+        }
+
+        function getPlainText() {
+            const noteContent = document.getElementById('noteContent');
+            return noteContent.innerText || noteContent.textContent || '';
+        }
+
+        function processFormatting() {
+            if (isProcessingInput) return;
+            isProcessingInput = true;
+            
+            const noteContent = document.getElementById('noteContent');
+            const selection = window.getSelection();
+            const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
+            
+            // Get current cursor position
+            let cursorPosition = 0;
+            if (range) {
+                const preCaretRange = range.cloneRange();
+                preCaretRange.selectNodeContents(noteContent);
+                preCaretRange.setEnd(range.endContainer, range.endOffset);
+                cursorPosition = preCaretRange.toString().length;
+            }
+            
+            // Get plain text content
+            const plainText = getPlainText();
+            
+            // Only process if there are formatting characters to avoid unnecessary updates
+            if (!/[*_]/.test(plainText)) {
+                isProcessingInput = false;
+                return;
+            }
+            
+            // Convert to formatted HTML
+            const formattedHTML = convertTextToFormattedHTML(plainText);
+            
+            // Only update if content actually changed
+            if (noteContent.innerHTML !== formattedHTML) {
+                noteContent.innerHTML = formattedHTML;
+                
+                // Restore cursor position
+                restoreCursorPosition(noteContent, cursorPosition);
+            }
+            
+            // Update the note content
+            currentNote.content = plainText;
+            
+            isProcessingInput = false;
+        }
+
+        function convertTextToFormattedHTML(text) {
+            // Escape HTML first
+            let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+            
+            // Handle line breaks
+            html = html.replace(/\n/g, '<br>');
+            
+            // Process formatting patterns in order of specificity (most specific first)
+            // We need to handle the most complex patterns first to avoid conflicts
+            
+            // _***text***_ = bold + italic + underline  
+            html = html.replace(/_\*\*\*([^*_]+)\*\*\*_/g, '<span class="bold-italic-underline">$1</span>');
+            
+            // _**text**_ = italic + underline
+            html = html.replace(/_\*\*([^*_]+)\*\*_/g, '<span class="italic-underline">$1</span>');
+            
+            // _*text*_ = bold + underline  
+            html = html.replace(/_\*([^*_]+)\*_/g, '<span class="bold-underline">$1</span>');
+            
+            // ***text*** = bold + italic
+            html = html.replace(/\*\*\*([^*_]+)\*\*\*/g, '<span class="bold-italic">$1</span>');
+            
+            // **text** = italic  
+            html = html.replace(/\*\*([^*_]+)\*\*/g, '<span class="italic">$1</span>');
+            
+            // *text* = bold
+            html = html.replace(/\*([^*_]+)\*/g, '<span class="bold">$1</span>');
+            
+            // _text_ = underline
+            html = html.replace(/_([^*_]+)_/g, '<span class="underline">$1</span>');
+            
+            return html;
+        }
+
+        function restoreCursorPosition(element, position) {
+            const walker = document.createTreeWalker(
+                element,
+                NodeFilter.SHOW_TEXT,
+                null,
+                false
+            );
+            
+            let currentPosition = 0;
+            let node;
+            
+            while (node = walker.nextNode()) {
+                const nodeLength = node.textContent.length;
+                if (currentPosition + nodeLength >= position) {
+                    const range = document.createRange();
+                    const selection = window.getSelection();
+                    
+                    range.setStart(node, position - currentPosition);
+                    range.collapse(true);
+                    
+                    selection.removeAllRanges();
+                    selection.addRange(range);
+                    break;
+                }
+                currentPosition += nodeLength;
+            }
         }
 
         function autoSave() {
@@ -802,23 +986,6 @@
             currentNote.isPinned = !currentNote.isPinned;
             document.getElementById('pinBtn').classList.toggle('active', currentNote.isPinned);
             saveNotes();
-        }
-
-        function toggleArchive() {
-            if (!currentNote) return;
-            currentNote.isArchived = !currentNote.isArchived;
-            saveNotes();
-            
-            // If archiving current note, go back to list
-            if (currentNote.isArchived && filterType !== 'archived') {
-                closeEditor();
-            }
-        }
-
-        function deleteNote() {
-            if (!currentNote) return;
-            swipeNoteId = currentNote.id;
-            document.getElementById('deleteModal').classList.add('show');
         }
 
         function deleteNoteById(noteId) {
@@ -848,27 +1015,6 @@
             renderNotesList();
         }
 
-        function exportNote() {
-            if (!currentNote) return;
-            
-            const noteData = {
-                title: currentNote.title,
-                content: currentNote.content,
-                createdAt: currentNote.createdAt,
-                updatedAt: currentNote.updatedAt
-            };
-            
-            const blob = new Blob([JSON.stringify(noteData, null, 2)], { type: 'application/json' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `${currentNote.title.replace(/[^a-z0-9]/gi, '_')}.json`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
         // Swipe handling functions
         function handleTouchStart(e, noteId) {
             if (isSwipeActive) return;
@@ -894,13 +1040,11 @@
             const deltaX = startX - currentX;
             const deltaY = Math.abs(touch.clientY - startY);
             
-            // More forgiving vertical movement - increased from 50px to 80px
             if (deltaY > 80) {
                 cancelSwipe();
                 return;
             }
             
-            // Only allow left swipe, but be more forgiving
             if (deltaX > 0) {
                 const swipeDistance = Math.min(deltaX, maxSwipeDistance);
                 const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
@@ -909,7 +1053,6 @@
                 if (noteItem) {
                     noteItem.style.transform = `translateX(-${swipeDistance}px)`;
                     
-                    // Add visual feedback when approaching threshold
                     if (deltaX > swipeThreshold * 0.7) {
                         noteItem.style.transition = 'none';
                     }
@@ -928,20 +1071,16 @@
                 noteItem.classList.remove('swiping');
                 
                 if (deltaX > swipeThreshold) {
-                    // Swipe threshold reached - trigger delete with animation
                     noteItem.style.transition = 'transform 0.2s ease-out';
                     noteItem.style.transform = `translateX(-${maxSwipeDistance}px)`;
                     
-                    // Show delete modal after animation
                     setTimeout(() => {
                         deleteNoteById(swipeNoteId);
                     }, 100);
                 } else {
-                    // Reset position immediately with smooth animation
                     noteItem.style.transition = 'transform 0.2s ease-out';
                     noteItem.style.transform = 'translateX(0px)';
                     
-                    // Clear transition after animation
                     setTimeout(() => {
                         if (noteItem) {
                             noteItem.style.transition = '';
@@ -952,7 +1091,7 @@
             
             isSwipeActive = false;
             if (deltaX <= swipeThreshold) {
-                swipeNoteId = null; // Only reset if we didn't trigger delete
+                swipeNoteId = null;
             }
         }
 
@@ -967,7 +1106,6 @@
                 noteItem.style.transition = 'transform 0.2s ease-out';
                 noteItem.style.transform = 'translateX(0px)';
                 
-                // Clear transition after animation
                 setTimeout(() => {
                     if (noteItem) {
                         noteItem.style.transition = '';
@@ -985,54 +1123,6 @@
                 return;
             }
             selectNote(noteId);
-        }
-
-        // Text Formatting
-        function formatText(command) {
-            const textarea = document.getElementById('noteContent');
-            const start = textarea.selectionStart;
-            const end = textarea.selectionEnd;
-            const selectedText = textarea.value.substring(start, end);
-            
-            let formattedText = '';
-            switch(command) {
-                case 'bold':
-                    formattedText = `**${selectedText}**`;
-                    break;
-                case 'italic':
-                    formattedText = `*${selectedText}*`;
-                    break;
-                case 'underline':
-                    formattedText = `__${selectedText}__`;
-                    break;
-            }
-            
-            textarea.value = textarea.value.substring(0, start) + formattedText + textarea.value.substring(end);
-            textarea.focus();
-            textarea.setSelectionRange(start + 2, start + 2 + selectedText.length);
-            handleContentChange({ target: textarea });
-        }
-
-        function insertList(type) {
-            const textarea = document.getElementById('noteContent');
-            const start = textarea.selectionStart;
-            const prefix = type === 'ul' ? '• ' : '1. ';
-            
-            textarea.value = textarea.value.substring(0, start) + '\n' + prefix + textarea.value.substring(start);
-            textarea.focus();
-            textarea.setSelectionRange(start + prefix.length + 1, start + prefix.length + 1);
-            handleContentChange({ target: textarea });
-        }
-
-        function insertCheckbox() {
-            const textarea = document.getElementById('noteContent');
-            const start = textarea.selectionStart;
-            const checkbox = '[ ] ';
-            
-            textarea.value = textarea.value.substring(0, start) + '\n' + checkbox + textarea.value.substring(start);
-            textarea.focus();
-            textarea.setSelectionRange(start + checkbox.length + 1, start + checkbox.length + 1);
-            handleContentChange({ target: textarea });
         }
 
         // Search and Filter
@@ -1055,13 +1145,10 @@
             const notesList = document.getElementById('notesList');
             let filteredNotes = notes;
             
-            // Apply filter
             if (filterType === 'pinned') {
                 filteredNotes = filteredNotes.filter(note => note.isPinned);
             }
-            // 'all' shows all notes - no filtering needed
             
-            // Apply search
             if (searchTerm) {
                 filteredNotes = filteredNotes.filter(note => 
                     note.title.toLowerCase().includes(searchTerm) ||
@@ -1069,7 +1156,6 @@
                 );
             }
             
-            // Sort: pinned first, then by date
             filteredNotes.sort((a, b) => {
                 if (a.isPinned && !b.isPinned) return -1;
                 if (!a.isPinned && b.isPinned) return 1;
@@ -1094,7 +1180,8 @@
                 noteContainer.className = 'note-swipe-container';
                 noteContainer.dataset.noteId = note.id;
                 
-                const preview = note.content.replace(/[*_#\[\]]/g, '').substring(0, 100);
+                // Strip formatting for preview
+                const preview = note.content.replace(/[*_]/g, '').substring(0, 100);
                 
                 noteContainer.innerHTML = `
                     <div class="note-swipe-background">
@@ -1112,7 +1199,6 @@
                     </div>
                 `;
                 
-                // Add touch event listeners
                 noteContainer.addEventListener('touchstart', (e) => handleTouchStart(e, note.id), { passive: false });
                 noteContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
                 noteContainer.addEventListener('touchend', handleTouchEnd, { passive: false });
@@ -1142,14 +1228,12 @@
         }
 
         function updateCharCount() {
-            const content = document.getElementById('noteContent').value;
+            const content = document.getElementById('noteContent').innerText || '';
             document.getElementById('charCount').textContent = `${content.length} characters`;
         }
 
         function updateLastSaved() {
-            if (currentNote) {
-                document.getElementById('lastSaved').textContent = `Last saved: ${formatDate(currentNote.updatedAt)}`;
-            }
+            document.getElementById('lastSaved').textContent = 'Auto-saved';
         }
 
         function formatDate(dateString) {
@@ -1169,16 +1253,9 @@
         function saveNotes() {
             try {
                 localStorage.setItem('notes', JSON.stringify(notes));
-                console.log('Notes saved to localStorage');
                 return true;
             } catch (e) {
                 console.error('Failed to save notes:', e);
-                
-                if (e.name === 'QuotaExceededError') {
-                    alert('Storage quota exceeded. Please delete some notes to free up space.');
-                } else {
-                    alert('Failed to save notes. Please check your browser settings.');
-                }
                 return false;
             }
         }
@@ -1188,7 +1265,6 @@
                 const savedNotes = localStorage.getItem('notes');
                 if (savedNotes) {
                     notes = JSON.parse(savedNotes);
-                    console.log('Notes loaded from localStorage');
                 }
             } catch (e) {
                 console.error('Failed to load notes:', e);
@@ -1200,7 +1276,6 @@
             const modal = document.getElementById('deleteModal');
             modal.classList.remove('show');
             
-            // Reset any swiped note position when canceling
             if (swipeNoteId) {
                 const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
                 
@@ -1208,11 +1283,9 @@
                     const noteItem = noteContainer.querySelector('.note-item');
                     
                     if (noteItem) {
-                        // Force reset position with animation
                         noteItem.style.transition = 'transform 0.3s ease-out';
                         noteItem.style.transform = 'translateX(0px)';
                         
-                        // Clear transition after animation
                         setTimeout(() => {
                             if (noteItem) {
                                 noteItem.style.transition = '';
@@ -1225,21 +1298,19 @@
             swipeNoteId = null;
         }
 
-        // Handle clicks outside modal
+        // Event listeners
         window.onclick = function(event) {
             if (event.target.classList.contains('modal')) {
                 closeModal();
             }
         }
 
-        // Handle back button
         window.addEventListener('popstate', function(e) {
             if (document.getElementById('editorContainer').classList.contains('active')) {
                 closeEditor();
             }
         });
 
-        // Auto-save on page unload
         window.addEventListener('beforeunload', function() {
             if (currentNote) {
                 currentNote.updatedAt = new Date().toISOString();
@@ -1247,7 +1318,6 @@
             }
         });
 
-        // Prevent scrolling when swiping
         document.addEventListener('touchmove', function(e) {
             if (isSwipeActive) {
                 e.preventDefault();
