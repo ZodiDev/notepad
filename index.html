@@ -679,13 +679,17 @@ _***all three***_"></div>
         let swipeNoteId = null;
         let isProcessingInput = false;
 
-        // Swipe state
+        // Improved swipe state management
+        let touchStarted = false;
         let isSwipeActive = false;
         let startX = 0;
         let startY = 0;
         let currentX = 0;
+        let currentY = 0;
         let swipeThreshold = 60;
         let maxSwipeDistance = 120;
+        let minSwipeDistance = 15; // Minimum distance before we consider it a swipe
+        let swipeDirectionLocked = false;
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -1049,62 +1053,89 @@ _***all three***_"></div>
             renderNotesList();
         }
 
-        // Swipe handling functions
+        // Improved swipe handling functions
         function handleTouchStart(e, noteId) {
-            if (isSwipeActive) return;
+            // Reset all swipe states
+            touchStarted = true;
+            isSwipeActive = false;
+            swipeDirectionLocked = false;
             
             const touch = e.touches[0];
             startX = touch.clientX;
             startY = touch.clientY;
             currentX = startX;
+            currentY = startY;
             
-            const noteItem = e.currentTarget.querySelector('.note-item');
-            noteItem.classList.add('swiping');
-            
-            isSwipeActive = true;
             swipeNoteId = noteId;
+            
+            // Don't add swiping class or prevent anything yet - wait to see direction
         }
 
         function handleTouchMove(e) {
-            if (!isSwipeActive) return;
+            if (!touchStarted) return;
             
-            e.preventDefault();
             const touch = e.touches[0];
             currentX = touch.clientX;
-            const deltaX = startX - currentX;
-            const deltaY = Math.abs(touch.clientY - startY);
+            currentY = touch.clientY;
             
-            if (deltaY > 80) {
-                cancelSwipe();
-                return;
+            const deltaX = startX - currentX;
+            const deltaY = Math.abs(currentY - startY);
+            const absDeltaX = Math.abs(deltaX);
+            
+            // If we haven't determined direction yet and movement is significant enough
+            if (!swipeDirectionLocked && (absDeltaX > minSwipeDistance || deltaY > minSwipeDistance)) {
+                swipeDirectionLocked = true;
+                
+                // Check if movement is more horizontal than vertical and moving left
+                if (absDeltaX > deltaY && deltaX > 0) {
+                    // This is a horizontal swipe left - activate swipe mode
+                    isSwipeActive = true;
+                    const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
+                    const noteItem = noteContainer ? noteContainer.querySelector('.note-item') : null;
+                    if (noteItem) {
+                        noteItem.classList.add('swiping');
+                    }
+                } else {
+                    // This is vertical scrolling or horizontal swipe right - don't interfere
+                    touchStarted = false;
+                    swipeNoteId = null;
+                    return;
+                }
             }
             
-            if (deltaX > 0) {
-                const swipeDistance = Math.min(deltaX, maxSwipeDistance);
-                const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
-                const noteItem = noteContainer ? noteContainer.querySelector('.note-item') : null;
+            // Only process swipe if we're in active swipe mode
+            if (isSwipeActive) {
+                e.preventDefault(); // Only prevent default when we're sure it's a swipe
                 
-                if (noteItem) {
-                    noteItem.style.transform = `translateX(-${swipeDistance}px)`;
+                // Apply visual feedback for the swipe
+                if (deltaX > 0) {
+                    const swipeDistance = Math.min(deltaX, maxSwipeDistance);
+                    const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
+                    const noteItem = noteContainer ? noteContainer.querySelector('.note-item') : null;
                     
-                    if (deltaX > swipeThreshold * 0.7) {
-                        noteItem.style.transition = 'none';
+                    if (noteItem) {
+                        noteItem.style.transform = `translateX(-${swipeDistance}px)`;
+                        
+                        if (deltaX > swipeThreshold * 0.7) {
+                            noteItem.style.transition = 'none';
+                        }
                     }
                 }
             }
         }
 
         function handleTouchEnd(e) {
-            if (!isSwipeActive) return;
+            if (!touchStarted) return;
             
             const deltaX = startX - currentX;
             const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
             const noteItem = noteContainer ? noteContainer.querySelector('.note-item') : null;
             
-            if (noteItem) {
+            if (isSwipeActive && noteItem) {
                 noteItem.classList.remove('swiping');
                 
                 if (deltaX > swipeThreshold) {
+                    // Swipe was far enough - trigger delete
                     noteItem.style.transition = 'transform 0.2s ease-out';
                     noteItem.style.transform = `translateX(-${maxSwipeDistance}px)`;
                     
@@ -1112,6 +1143,7 @@ _***all three***_"></div>
                         deleteNoteById(swipeNoteId);
                     }, 100);
                 } else {
+                    // Swipe wasn't far enough - snap back
                     noteItem.style.transition = 'transform 0.2s ease-out';
                     noteItem.style.transform = 'translateX(0px)';
                     
@@ -1121,16 +1153,22 @@ _***all three***_"></div>
                         }
                     }, 250);
                 }
+            } else if (!isSwipeActive && swipeNoteId && deltaX <= minSwipeDistance) {
+                // This was a tap, not a swipe - handle the note click
+                selectNote(swipeNoteId);
             }
             
+            // Reset all states
+            touchStarted = false;
             isSwipeActive = false;
+            swipeDirectionLocked = false;
             if (deltaX <= swipeThreshold) {
                 swipeNoteId = null;
             }
         }
 
         function cancelSwipe() {
-            if (!isSwipeActive) return;
+            if (!touchStarted) return;
             
             const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
             const noteItem = noteContainer ? noteContainer.querySelector('.note-item') : null;
@@ -1147,11 +1185,14 @@ _***all three***_"></div>
                 }, 250);
             }
             
+            touchStarted = false;
             isSwipeActive = false;
+            swipeDirectionLocked = false;
             swipeNoteId = null;
         }
 
         function handleNoteClick(e, noteId) {
+            // Only handle click if we're not in the middle of a swipe
             if (isSwipeActive) {
                 e.preventDefault();
                 return;
@@ -1377,12 +1418,6 @@ _***all three***_"></div>
                 saveNotes();
             }
         });
-
-        document.addEventListener('touchmove', function(e) {
-            if (isSwipeActive) {
-                e.preventDefault();
-            }
-        }, { passive: false });
     </script>
 </body>
 </html>
