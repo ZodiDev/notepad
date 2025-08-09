@@ -683,6 +683,22 @@ _***all three***_"></div>
             loadNotes();
             renderNotesList();
             
+            // Handle initial URL if there's a note hash
+            if (window.location.hash && window.location.hash.startsWith('#note-')) {
+                const noteId = window.location.hash.replace('#note-', '');
+                const note = notes.find(n => n.id === noteId);
+                if (note) {
+                    currentNote = note;
+                    openEditor();
+                } else {
+                    // Invalid note ID, go back to list
+                    history.replaceState({ view: 'list' }, '', window.location.pathname);
+                }
+            } else {
+                // Make sure we start with list state in history
+                history.replaceState({ view: 'list' }, '', window.location.pathname);
+            }
+            
             // Event listeners
             document.getElementById('searchBox').addEventListener('input', handleSearch);
             document.getElementById('noteTitle').addEventListener('input', handleTitleChange);
@@ -758,7 +774,7 @@ _***all three***_"></div>
             currentNote = newNote;
             saveNotes();
             renderNotesList();
-            openEditor();
+            openEditor(); // This will handle the history push
         }
 
         function selectNote(noteId) {
@@ -769,6 +785,9 @@ _***all three***_"></div>
 
         function openEditor() {
             if (!currentNote) return;
+            
+            // Push a state to browser history so back button works
+            history.pushState({ view: 'editor', noteId: currentNote.id }, '', `#note-${currentNote.id}`);
             
             document.getElementById('sidebar').classList.add('hidden');
             document.getElementById('editorContainer').classList.add('active');
@@ -796,6 +815,11 @@ _***all three***_"></div>
             document.getElementById('editorContainer').classList.remove('active');
             document.getElementById('fab').classList.remove('hidden');
             renderNotesList();
+            
+            // Update URL to show we're back at notes list
+            if (window.location.hash) {
+                history.replaceState({ view: 'list' }, '', window.location.pathname);
+            }
         }
 
         function handleTitleChange(e) {
@@ -1000,10 +1024,12 @@ _***all three***_"></div>
             notes = notes.filter(note => note.id !== swipeNoteId);
             saveNotes();
             
-            // If deleting current note in editor, close editor
+            // If deleting current note in editor, close editor and update history
             if (currentNote && currentNote.id === swipeNoteId) {
                 currentNote = null;
                 closeEditor();
+                // Replace the current history state to prevent going back to deleted note
+                history.replaceState({ view: 'list' }, '', window.location.pathname);
             }
             
             // Close modal and reset
@@ -1306,8 +1332,34 @@ _***all three***_"></div>
         }
 
         window.addEventListener('popstate', function(e) {
-            if (document.getElementById('editorContainer').classList.contains('active')) {
+            const editorActive = document.getElementById('editorContainer').classList.contains('active');
+            
+            if (editorActive) {
+                // If editor is open and user pressed back, close it
                 closeEditor();
+            } else if (e.state && e.state.view === 'editor' && e.state.noteId) {
+                // If we're going forward to a note, open it
+                const note = notes.find(n => n.id === e.state.noteId);
+                if (note) {
+                    currentNote = note;
+                    // Don't push another state since we're responding to popstate
+                    document.getElementById('sidebar').classList.add('hidden');
+                    document.getElementById('editorContainer').classList.add('active');
+                    document.getElementById('fab').classList.add('hidden');
+                    
+                    document.getElementById('noteTitle').value = currentNote.title;
+                    const noteContent = document.getElementById('noteContent');
+                    noteContent.innerHTML = '';
+                    
+                    const formattedContent = convertTextToFormattedHTML(currentNote.content);
+                    noteContent.innerHTML = formattedContent;
+                    
+                    document.getElementById('pinBtn').classList.toggle('active', currentNote.isPinned);
+                    
+                    updateCharCount();
+                    updateLastSaved();
+                    noteContent.focus();
+                }
             }
         });
 
