@@ -3,1421 +3,1823 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Notes App</title>
+    <title>Password Manager</title>
     <style>
         * {
+            box-sizing: border-box;
             margin: 0;
             padding: 0;
-            box-sizing: border-box;
-        }
-
-        :root {
-            --bg-primary: #000000;
-            --bg-secondary: #1a1a1a;
-            --bg-tertiary: #2a2a2a;
-            --text-primary: #ffffff;
-            --text-secondary: #b0b0b0;
-            --accent: #007aff;
-            --accent-hover: #0051d5;
-            --danger: #ff3b30;
-            --warning: #ff9500;
-            --border: #333333;
-            --shadow: rgba(0, 0, 0, 0.5);
-            --note-bg: #1f1f1f;
         }
 
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            background-color: var(--bg-primary);
-            color: var(--text-primary);
-            line-height: 1.6;
-            height: 100dvh;
-            overflow: hidden;
-            -webkit-user-select: none;
-            -moz-user-select: none;
-            -ms-user-select: none;
-            user-select: none;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 10px;
+            line-height: 1.5;
         }
 
         .container {
-            display: flex;
-            height: 100dvh;
-            overflow: hidden;
-            position: relative;
-        }
-
-        /* Sidebar */
-        .sidebar {
-            width: 100%;
-            background-color: var(--bg-primary);
-            display: flex;
-            flex-direction: column;
-            position: absolute;
-            z-index: 10;
-            height: 100%;
-        }
-
-        .sidebar.hidden {
-            display: none;
-        }
-
-        .sidebar-header {
-            padding: 20px;
-            border-bottom: 1px solid var(--border);
-        }
-
-        .app-title {
-            font-size: 28px;
-            font-weight: 300;
-            margin-bottom: 20px;
-            letter-spacing: -0.5px;
-        }
-
-        .search-box {
-            width: 100%;
-            padding: 12px 16px;
-            border: none;
-            border-radius: 10px;
-            background-color: var(--bg-secondary);
-            color: var(--text-primary);
-            font-size: 16px;
-            margin-bottom: 10px;
-        }
-
-        .search-box::placeholder {
-            color: var(--text-secondary);
-        }
-
-        .filter-buttons {
-            display: flex;
-            gap: 10px;
-            margin-bottom: 10px;
-        }
-
-        .filter-btn {
-            flex: 1;
-            padding: 8px 16px;
-            background-color: var(--bg-secondary);
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-size: 14px;
-            color: var(--text-secondary);
-            transition: all 0.2s;
-        }
-
-        .filter-btn.active {
-            background-color: var(--accent);
-            color: white;
-        }
-
-        /* 2-Column Notes Layout */
-        .notes-list {
-            flex: 1;
-            overflow-y: auto;
-            padding: 10px;
-            -webkit-overflow-scrolling: touch;
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            grid-auto-rows: max-content;
-            gap: 8px;
-            align-content: start;
-            max-height: 100%;
-        }
-
-        /* Swipe container for notes */
-        .note-swipe-container {
-            position: relative;
-            border-radius: 10px;
-            overflow: hidden;
-            display: flex;
-            min-height: auto;
-        }
-
-        .note-swipe-background {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            background-color: var(--danger);
-            display: flex;
-            align-items: center;
-            justify-content: flex-end;
-            padding-right: 20px;
-            color: white;
-            font-size: 18px;
-            z-index: 1;
-            border-radius: 10px;
-        }
-
-        .note-item {
-            background-color: var(--bg-secondary);
-            border-radius: 10px;
-            padding: 10px;
-            cursor: pointer;
-            transition: transform 0.2s ease-out;
-            position: relative;
-            display: flex;
-            flex-direction: column;
-            min-height: 110px;
-            z-index: 2;
-            touch-action: pan-y;
-            width: 100%;
-            transform: translateX(0);
-            box-sizing: border-box;
-        }
-
-        .note-item.swiping {
-            transition: none;
-        }
-
-        .note-item:active:not(.swiping) {
-            transform: scale(0.98);
-        }
-
-        .note-item.pinned {
-            background-color: var(--note-bg);
-        }
-
-        .note-item-header {
-            display: flex;
-            justify-content: space-between;
-            align-items: start;
-            margin-bottom: 4px;
-        }
-
-        .note-item-title {
-            font-weight: 500;
-            font-size: 15px;
-            color: var(--text-primary);
-            flex: 1;
-            margin-right: 10px;
-            white-space: nowrap;
-            overflow: hidden;
-            text-overflow: ellipsis;
-        }
-
-        .note-item-icons {
-            display: flex;
-            gap: 8px;
-            flex-shrink: 0;
-        }
-
-        .pin-icon {
-            font-size: 14px;
-            color: var(--text-secondary);
-        }
-
-        .pin-icon.pinned {
-            color: var(--warning);
-        }
-
-        .note-item-preview {
-            color: var(--text-secondary);
-            font-size: 13px;
-            overflow: hidden;
-            display: -webkit-box;
-            -webkit-line-clamp: 2; line-height: 1.2; margin-bottom: 4px;
-            -webkit-box-orient: vertical;
-            margin-bottom: 6px;
-            line-height: 1.3;
-            flex-grow: 1;
-        }
-
-        .note-item-meta {
-            font-size: 11px;
-            color: var(--text-secondary);
-            margin-top: auto;
-        }
-
-        /* Save Status Indicator */
-        .save-status {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            padding: 8px 16px;
+            max-width: 450px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(20px);
             border-radius: 20px;
-            font-size: 12px;
-            font-weight: 500;
-            z-index: 1000;
-            transition: all 0.3s;
-            opacity: 0;
-            transform: translateY(-10px);
+            box-shadow: 0 8px 32px rgba(0,0,0,0.1);
+            overflow: hidden;
+            border: 1px solid rgba(255, 255, 255, 0.2);
         }
 
-        .save-status.show {
-            opacity: 1;
-            transform: translateY(0);
-        }
-
-        .save-status.saving {
-            background-color: var(--warning);
+        .header {
+            background: linear-gradient(135deg, #2c3e50, #34495e);
             color: white;
-        }
-
-        .save-status.saved {
-            background-color: #34c759;
-            color: white;
-        }
-
-        .save-status.error {
-            background-color: var(--danger);
-            color: white;
-        }
-
-        /* Editor */
-        .editor-container {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: var(--bg-primary);
-            z-index: 20;
-            display: none;
-            flex-direction: column;
-        }
-
-        .editor-container.active {
-            display: flex;
-        }
-
-        .editor-header {
-            padding: 16px 20px;
-            border-bottom: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            background-color: var(--bg-primary);
-        }
-
-        .back-btn {
-            background: none;
-            border: none;
-            font-size: 24px;
-            cursor: pointer;
-            color: var(--accent);
-            padding: 8px;
-            margin-right: 12px;
-        }
-
-        .editor-title {
-            flex: 1;
-            font-size: 20px;
-            font-weight: 500;
-            background: none;
-            border: none;
-            color: var(--text-primary);
-            padding: 0;
-        }
-
-        .editor-actions {
-            display: flex;
-            gap: 16px;
-        }
-
-        .action-btn {
-            background: none;
-            border: none;
-            font-size: 22px;
-            cursor: pointer;
-            color: var(--text-secondary);
-            padding: 8px;
-            transition: all 0.2s;
-        }
-
-        .action-btn:active {
-            transform: scale(0.9);
-        }
-
-        .action-btn.active {
-            color: var(--warning);
-        }
-
-        .editor-content {
-            flex: 1;
             padding: 20px;
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch;
-        }
-
-        .editor-textarea {
-            width: 100%;
-            min-height: 100%;
-            background: none;
-            border: none;
-            color: var(--text-primary);
-            font-size: 17px;
-            line-height: 1.6;
-            font-family: inherit;
-            outline: none;
-            -webkit-user-select: text;
-            -moz-user-select: text;
-            -ms-user-select: text;
-            user-select: text;
-        }
-
-        .editor-textarea:focus {
-            outline: none;
-        }
-
-        /* Formatting styles for the contenteditable editor */
-        .editor-textarea .bold {
-            font-weight: bold;
-        }
-
-        .editor-textarea .italic {
-            font-style: italic;
-        }
-
-        .editor-textarea .underline {
-            text-decoration: underline;
-        }
-
-        .editor-textarea .bold-italic {
-            font-weight: bold;
-            font-style: italic;
-        }
-
-        .editor-textarea .italic-underline {
-            font-style: italic;
-            text-decoration: underline;
-        }
-
-        .editor-textarea .bold-underline {
-            font-weight: bold;
-            text-decoration: underline;
-        }
-
-        .editor-textarea .bold-italic-underline {
-            font-weight: bold;
-            font-style: italic;
-            text-decoration: underline;
-        }
-
-        .editor-footer {
-            padding: 12px 20px;
-            border-top: 1px solid var(--border);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 13px;
-            color: var(--text-secondary);
-            background-color: var(--bg-primary);
-        }
-
-        /* Empty state */
-        .empty-state {
-            grid-column: 1 / -1;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            height: 200px;
-            color: var(--text-secondary);
-            padding: 40px;
             text-align: center;
+            position: relative;
         }
 
-        .empty-state-icon {
-            font-size: 64px;
-            margin-bottom: 24px;
-            opacity: 0.5;
+        .header h1 {
+            font-size: 1.4rem;
+            margin-bottom: 5px;
+            font-weight: 700;
         }
 
-        .empty-state-text {
-            font-size: 20px;
-            margin-bottom: 8px;
-            font-weight: 300;
+        .header p {
+            font-size: 0.85rem;
+            opacity: 0.9;
         }
 
-        .empty-state-subtext {
-            font-size: 16px;
-            color: var(--text-secondary);
+        .sync-status {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            padding: 4px 8px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
         }
 
-        /* Floating Action Button */
-        .fab {
-            position: fixed;
-            bottom: 24px;
-            right: 24px;
-            width: 56px;
-            height: 56px;
-            background-color: var(--accent);
-            border-radius: 50%;
-            border: none;
-            cursor: pointer;
-            box-shadow: 0 4px 12px var(--shadow);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: all 0.2s;
-            z-index: 100;
-        }
-
-        .fab:active {
-            transform: scale(0.95);
-        }
-
-        .fab svg {
-            width: 24px;
-            height: 24px;
+        .sync-online {
+            background: rgba(39, 174, 96, 0.9);
             color: white;
         }
 
-        .fab.hidden {
-            display: none;
+        .sync-offline {
+            background: rgba(231, 76, 60, 0.9);
+            color: white;
         }
 
-        /* Modal */
-        .modal {
-            display: none;
-            position: fixed;
-            top: 0;
-            left: 0;
+        .section {
+            padding: 20px;
+        }
+
+        .section-mobile {
+            padding: 15px;
+        }
+
+        .info, .warning {
+            padding: 12px;
+            border-radius: 10px;
+            margin-bottom: 15px;
+            font-size: 0.9rem;
+        }
+
+        .info {
+            background: linear-gradient(135deg, #e3f2fd, #bbdefb);
+            border-left: 4px solid #2196f3;
+            color: #1565c0;
+        }
+
+        .warning {
+            background: linear-gradient(135deg, #fff3e0, #ffcc02);
+            border-left: 4px solid #ff9800;
+            color: #e65100;
+        }
+
+        .form-group {
+            margin-bottom: 15px;
+        }
+
+        .form-group-compact {
+            margin-bottom: 12px;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            color: #2c3e50;
+            font-size: 0.9rem;
+        }
+
+        .input-container {
+            position: relative;
+        }
+
+        input[type="text"], input[type="password"], input[type="url"], textarea {
             width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.8);
-            z-index: 1000;
-            align-items: center;
-            justify-content: center;
+            padding: 12px;
+            border: 2px solid #e9ecef;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: all 0.3s ease;
+            background: rgba(255, 255, 255, 0.9);
         }
 
-        .modal.show {
-            display: flex;
+        input:focus, textarea:focus {
+            outline: none;
+            border-color: #3498db;
+            background: white;
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(52, 152, 219, 0.15);
         }
 
-        .modal-content {
-            background-color: var(--bg-secondary);
-            padding: 24px;
-            border-radius: 16px;
-            box-shadow: 0 5px 20px var(--shadow);
-            max-width: 320px;
-            width: 90%;
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 1.2rem;
+            color: #6c757d;
+            padding: 0;
+            z-index: 2;
         }
 
-        .modal-header {
-            font-size: 20px;
-            font-weight: 500;
-            margin-bottom: 16px;
-        }
-
-        .modal-body {
-            margin-bottom: 24px;
-            color: var(--text-secondary);
-        }
-
-        .modal-footer {
-            display: flex;
-            justify-content: flex-end;
-            gap: 12px;
+        .password-toggle:hover {
+            color: #3498db;
         }
 
         .btn {
-            padding: 10px 20px;
+            width: 100%;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            color: white;
             border: none;
-            border-radius: 8px;
+            padding: 14px 20px;
+            border-radius: 10px;
             cursor: pointer;
-            font-size: 16px;
-            transition: all 0.2s;
-            font-weight: 500;
+            font-size: 1rem;
+            font-weight: 600;
+            transition: all 0.3s ease;
+            margin-bottom: 10px;
+            position: relative;
+            overflow: hidden;
         }
 
-        .btn-secondary {
-            background-color: var(--bg-tertiary);
-            color: var(--text-primary);
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(52, 152, 219, 0.3);
+        }
+
+        .btn:active {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #3498db, #2980b9);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #27ae60, #229954);
         }
 
         .btn-danger {
-            background-color: var(--danger);
+            background: linear-gradient(135deg, #e74c3c, #c0392b);
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+            font-size: 0.9rem;
+            padding: 10px 16px;
+        }
+
+        .btn-row {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 10px;
+        }
+
+        .btn-row .btn {
+            margin-bottom: 0;
+        }
+
+        .password-item {
+            background: rgba(255, 255, 255, 0.9);
+            border-radius: 12px;
+            padding: 15px;
+            margin-bottom: 12px;
+            border: 1px solid rgba(0,0,0,0.05);
+            transition: all 0.3s ease;
+            position: relative;
+            cursor: pointer;
+            user-select: none;
+            transform: translateX(0);
+        }
+
+        .password-item:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+        }
+
+        .password-item.swiping {
+            transition: none;
+        }
+
+        .password-item.delete-ready {
+            background: rgba(231, 76, 60, 0.1);
+            border-color: rgba(231, 76, 60, 0.3);
+        }
+
+        .delete-icon {
+            position: absolute;
+            top: 8px;
+            right: 8px;
+            width: 24px;
+            height: 24px;
+            background: rgba(231, 76, 60, 0.8);
             color: white;
-        }
-
-        /* Hide scrollbar but keep functionality */
-        .notes-list::-webkit-scrollbar,
-        .editor-content::-webkit-scrollbar {
-            display: none;
-        }
-
-        .notes-list,
-        .editor-content {
-            -ms-overflow-style: none;
-            scrollbar-width: none;
-        }
-
-        /* Swipe hint text */
-        .swipe-hint {
-            position: fixed;
-            bottom: 100px;
-            left: 50%;
-            transform: translateX(-50%);
-            background-color: rgba(0, 0, 0, 0.8);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
-            font-size: 14px;
+            border: none;
+            border-radius: 50%;
+            cursor: pointer;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             opacity: 0;
-            transition: opacity 0.3s;
-            z-index: 50;
+            transition: opacity 0.2s ease;
+            z-index: 10;
+        }
+
+        .password-item:hover .delete-icon {
+            opacity: 1;
+        }
+
+        .delete-icon:hover {
+            background: rgba(231, 76, 60, 1);
+            transform: scale(1.1);
+        }
+
+        .swipe-indicator {
+            position: absolute;
+            right: -60px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: rgba(231, 76, 60, 0.9);
+            color: white;
+            padding: 8px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 600;
+            opacity: 0;
+            transition: opacity 0.2s ease;
             pointer-events: none;
         }
 
-        .swipe-hint.show {
+        .password-item.delete-ready .swipe-indicator {
             opacity: 1;
         }
-    
-.note-swipe-container { min-height: auto; }
-.notes-list { overflow-y: auto; }
 
-
-/* Force exactly two columns at all widths */
-.notes-list { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-
-</style>
-</head>
-<body>
-    <!-- Save Status Indicator -->
-    <div class="save-status" id="saveStatus"></div>
-
-    <!-- Swipe Hint -->
-    <div class="swipe-hint" id="swipeHint">Swipe left to delete</div>
-
-    <div class="container">
-        <!-- Notes List -->
-        <div class="sidebar" id="sidebar">
-            <div class="sidebar-header">
-                <div class="app-title">Notes</div>
-                <input type="text" class="search-box" placeholder="Search notes..." id="searchBox">
-                <div class="filter-buttons">
-                    <button class="filter-btn active" onclick="filterNotes('all')">All</button>
-                    <button class="filter-btn" onclick="filterNotes('pinned')">Pinned</button>
-                </div>
-            </div>
-            <div class="notes-list" id="notesList"></div>
-        </div>
-
-        <!-- Editor -->
-        <div class="editor-container" id="editorContainer">
-            <div class="editor-header">
-                <button class="back-btn" onclick="closeEditor()">‹</button>
-                <input type="text" class="editor-title" id="noteTitle" placeholder="Untitled Note">
-                <div class="editor-actions">
-                    <button class="action-btn" id="pinBtn" onclick="togglePin()">📌</button>
-                </div>
-            </div>
-            
-            <div class="editor-content">
-                <div class="editor-textarea" id="noteContent" contenteditable="true" 
-                     data-placeholder="Start typing... 
-
-Formatting happens when you press space or pause:
-*bold text* → bold text
-**italic text** → italic text  
-***bold italic*** → bold italic
-_underlined text_ → underlined text
-
-Combine them:
-_*bold + underlined*_
-_***all three***_"></div>
-            </div>
-            
-            <div class="editor-footer">
-                <span id="lastSaved">Auto-saved</span>
-                <span id="charCount">0 characters</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Floating Action Button -->
-    <button class="fab" id="fab" onclick="createNewNote()">
-        <svg fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-        </svg>
-    </button>
-
-    <!-- Delete Confirmation Modal -->
-    <div class="modal" id="deleteModal">
-        <div class="modal-content">
-            <div class="modal-header">Delete Note</div>
-            <div class="modal-body">
-                Are you sure you want to delete this note? This action cannot be undone.
-            </div>
-            <div class="modal-footer">
-                <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
-                <button class="btn btn-danger" onclick="confirmDelete()">Delete</button>
-            </div>
-        </div>
-    </div>
-
-    <style>
-        /* Placeholder styling for contenteditable */
-        .editor-textarea:empty:before {
-            content: attr(data-placeholder);
-            color: var(--text-secondary);
-            font-style: italic;
-            white-space: pre-wrap;
+        /* Hide delete icon on mobile */
+        @media (max-width: 768px) {
+            .delete-icon {
+                display: none;
+            }
         }
-        
-        .editor-textarea:focus:before {
-            opacity: 0.7;
+
+        .password-item h3 {
+            color: #2c3e50;
+            margin-bottom: 8px;
+            font-size: 1.1rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
-        
-        .editor-textarea:not(:empty):before {
-            display: none;
+
+        .password-item .site-icon {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            background: linear-gradient(135deg, #3498db, #2980b9);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 0.8rem;
+            font-weight: bold;
+        }
+
+        .password-item p {
+            margin: 4px 0;
+            color: #6c757d;
+            font-size: 0.9rem;
+        }
+
+        .password-display {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            background: rgba(236, 240, 241, 0.8);
+            padding: 8px;
+            border-radius: 6px;
+            word-break: break-all;
+            margin: 8px 0;
+            font-size: 0.9rem;
+            border-left: 3px solid #3498db;
+        }
+
+        .hidden {
+            display: none !important;
+        }
+
+        .add-form {
+            background: rgba(248, 249, 250, 0.8);
+            padding: 15px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+
+        .add-form h3 {
+            margin-bottom: 15px;
+            color: #2c3e50;
+            font-size: 1.1rem;
+            text-align: center;
+        }
+
+        .form-row {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .form-row .form-group {
+            flex: 1;
+            margin-bottom: 0;
+        }
+
+        .passwords-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 15px;
+            width: 100%;
+        }
+
+        .search-container {
+            position: relative;
+            margin-bottom: 15px;
+        }
+
+        .search-input {
+            background: rgba(255, 255, 255, 0.9);
+        }
+
+        .clear-search {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #6c757d;
+            cursor: pointer;
+            padding: 0;
+            font-size: 1.2rem;
+        }
+
+        .password-strength {
+            height: 4px;
+            border-radius: 2px;
+            margin-top: 6px;
+            transition: all 0.3s ease;
+        }
+
+        .strength-weak { background: linear-gradient(90deg, #e74c3c, #c0392b); }
+        .strength-medium { background: linear-gradient(90deg, #f39c12, #e67e22); }
+        .strength-strong { background: linear-gradient(90deg, #27ae60, #229954); }
+
+        .loading {
+            text-align: center;
+            padding: 40px 20px;
+            color: #7f8c8d;
+        }
+
+        .empty-state {
+            text-align: center;
+            padding: 40px 20px;
+            color: #7f8c8d;
+        }
+
+        .empty-state-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            opacity: 0.6;
+        }
+
+        .steps {
+            text-align: left;
+            margin: 15px 0;
+        }
+
+        .steps ol {
+            padding-left: 20px;
+        }
+
+        .steps li {
+            margin-bottom: 8px;
+            font-size: 0.9rem;
+        }
+
+        .copy-feedback {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(39, 174, 96, 0.95);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 10px;
+            font-weight: 600;
+            z-index: 1000;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .copy-feedback.show {
+            opacity: 1;
+        }
+
+        /* Mobile specific optimizations */
+        @media (max-width: 480px) {
+            body {
+                padding: 5px;
+            }
+
+            .container {
+                border-radius: 15px;
+                max-width: 100%;
+            }
+
+            .header {
+                padding: 15px;
+            }
+
+            .header h1 {
+                font-size: 1.2rem;
+            }
+
+            .section {
+                padding: 15px;
+            }
+
+            .form-row {
+                flex-direction: column;
+                gap: 0;
+            }
+
+            .form-row .form-group {
+                margin-bottom: 12px;
+            }
+
+            .password-item {
+                padding: 12px;
+            }
+        }
+
+        /* Dark mode support */
+        @media (prefers-color-scheme: dark) {
+            .container {
+                background: rgba(45, 52, 65, 0.95);
+                color: #e9ecef;
+            }
+
+            input, textarea {
+                background: rgba(75, 85, 99, 0.9) !important;
+                color: #f1f5f9 !important;
+                border-color: #64748b;
+            }
+
+            input:focus, textarea:focus {
+                background: rgba(51, 65, 85, 0.95) !important;
+                border-color: #3498db;
+                color: #f1f5f9 !important;
+            }
+
+            input::placeholder, textarea::placeholder {
+                color: #94a3b8 !important;
+            }
+
+            .password-item {
+                background: rgba(55, 65, 81, 0.9);
+                color: #e9ecef;
+            }
+
+            .password-item.delete-ready {
+                background: rgba(231, 76, 60, 0.2);
+                border-color: rgba(231, 76, 60, 0.5);
+            }
+
+            .password-item h3 {
+                color: #e9ecef !important;
+            }
+
+            .password-item p {
+                color: #cbd5e0 !important;
+            }
+
+            .add-form {
+                background: rgba(55, 65, 81, 0.8);
+            }
+
+            .password-display {
+                background: rgba(75, 85, 99, 0.8);
+                color: #e9ecef !important;
+            }
+
+            label {
+                color: #e9ecef;
+            }
+
+            .info {
+                background: rgba(59, 130, 246, 0.2);
+                color: #dbeafe;
+                border-left: 4px solid #3b82f6;
+            }
+
+            .warning {
+                background: rgba(245, 158, 11, 0.2);
+                color: #fef3c7;
+                border-left: 4px solid #f59e0b;
+            }
         }
     </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🔐 Password Manager</h1>
+            <p>Secure • Synced • Simple</p>
+            <div class="sync-status sync-offline" id="syncStatus">⚫ Offline</div>
+        </div>
+
+        <!-- GitHub Setup -->
+        <div class="section" id="setupSection">
+            <div class="warning">
+                <strong>⚠️ First Time Setup</strong><br>
+                Configure GitHub sync to access your passwords anywhere.
+            </div>
+
+            <div class="steps">
+                <h4>Quick Setup:</h4>
+                <ol>
+                    <li>Create a <strong>private</strong> GitHub repository</li>
+                    <li>Generate a token with <strong>"Contents: Read and write"</strong> permissions</li>
+                    <li>Enter details below</li>
+                </ol>
+            </div>
+
+            <div class="form-group-compact">
+                <label for="githubUsername">GitHub Username</label>
+                <input type="text" id="githubUsername" placeholder="your-username">
+            </div>
+
+            <div class="form-group-compact">
+                <label for="repoName">Repository Name</label>
+                <input type="text" id="repoName" placeholder="my-passwords">
+            </div>
+
+            <div class="form-group-compact">
+                <label for="githubToken">Access Token</label>
+                <div class="input-container">
+                    <input type="password" id="githubToken" placeholder="github_pat_...">
+                    <button class="password-toggle" onclick="togglePasswordVisibility('githubToken')">👁️</button>
+                </div>
+            </div>
+
+            <button class="btn btn-success" onclick="saveGitHubConfig()">🚀 Save & Connect</button>
+            <button class="btn btn-secondary" onclick="testGitHubConnection()">🔍 Test Connection</button>
+            
+            <div style="text-align: center; margin-top: 15px;">
+                <small style="color: #7f8c8d;">
+                    Need help? <a href="#" onclick="skipGitHubCheck()" style="color: #3498db;">Skip verification</a>
+                </small>
+            </div>
+        </div>
+
+        <!-- Create Master Password -->
+        <div class="section hidden" id="createPasswordSection">
+            <div class="info">
+                <strong>🔐 Create Master Password</strong><br>
+                This encrypts all your passwords. Make it strong and memorable!
+            </div>
+            
+            <div class="form-group-compact">
+                <label for="newMasterPassword">Master Password</label>
+                <div class="input-container">
+                    <input type="password" id="newMasterPassword" placeholder="Create a strong password" onkeypress="if(event.key==='Enter') createMasterPassword()" oninput="checkPasswordStrength(this.value)">
+                    <button class="password-toggle" onclick="togglePasswordVisibility('newMasterPassword')">👁️</button>
+                </div>
+                <div class="password-strength" id="strengthIndicator"></div>
+            </div>
+            
+            <div class="form-group-compact">
+                <label for="confirmMasterPassword">Confirm Password</label>
+                <div class="input-container">
+                    <input type="password" id="confirmMasterPassword" placeholder="Confirm your password" onkeypress="if(event.key==='Enter') createMasterPassword()">
+                    <button class="password-toggle" onclick="togglePasswordVisibility('confirmMasterPassword')">👁️</button>
+                </div>
+            </div>
+            
+            <button class="btn btn-success" onclick="createMasterPassword()" id="createBtn">🔑 Create Vault</button>
+            <button class="btn btn-secondary" onclick="switchToLogin()">Already Have a Vault</button>
+        </div>
+
+        <!-- Login -->
+        <div class="section hidden" id="authSection">
+            <div class="info">
+                <strong>🔐 Welcome Back</strong><br>
+                Enter your master password to unlock your vault.
+            </div>
+            
+            <div class="form-group-compact">
+                <label for="masterPassword">Master Password</label>
+                <div class="input-container">
+                    <input type="password" id="masterPassword" placeholder="Enter your master password" onkeypress="if(event.key==='Enter') authenticate()">
+                    <button class="password-toggle" onclick="togglePasswordVisibility('masterPassword')">👁️</button>
+                </div>
+            </div>
+            
+            <button class="btn btn-primary" onclick="authenticate()" id="unlockBtn">🔓 Unlock Vault</button>
+            <button class="btn btn-secondary" onclick="switchToCreate()">Create New Vault</button>
+        </div>
+
+        <!-- Main Password Manager -->
+        <div class="section-mobile hidden" id="mainSection">
+            <!-- Add New Password Button -->
+            <div style="text-align: center; margin-bottom: 20px;">
+                <button class="btn btn-success" onclick="toggleAddForm()" id="toggleAddBtn">➕ Add New Password</button>
+            </div>
+
+            <!-- Add New Password Form (Initially Hidden) -->
+            <div class="add-form hidden" id="addPasswordForm">
+                <h3>➕ Add New Password</h3>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="siteName">Site/Service</label>
+                        <input type="text" id="siteName" placeholder="Gmail, Facebook...">
+                    </div>
+                    <div class="form-group">
+                        <label for="siteUrl">URL (optional)</label>
+                        <input type="url" id="siteUrl" placeholder="https://...">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="username">Username/Email</label>
+                        <input type="text" id="username" placeholder="your@email.com">
+                    </div>
+                    <div class="form-group">
+                        <label for="password">Password</label>
+                        <div class="input-container">
+                            <input type="password" id="password" placeholder="Your password">
+                            <button class="password-toggle" onclick="togglePasswordVisibility('password')">👁️</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="btn-row">
+                    <button class="btn btn-success" onclick="addPassword()" id="addBtn">💾 Save</button>
+                    <button class="btn btn-secondary" onclick="generatePassword()">🎲 Generate</button>
+                </div>
+            </div>
+
+            <!-- Search & Import -->
+            <div class="search-container">
+                <input type="text" class="search-input" id="searchInput" placeholder="Search passwords..." oninput="filterPasswords()">
+                <button class="clear-search hidden" id="clearSearch" onclick="clearSearch()">✕</button>
+            </div>
+            
+            <div class="btn-row" style="margin-bottom: 15px;">
+                <button class="btn btn-secondary" onclick="document.getElementById('csvImport').click()">📥 Import CSV</button>
+                <button class="btn btn-secondary" onclick="exportCSV()">📤 Export CSV</button>
+            </div>
+            
+            <input type="file" id="csvImport" accept=".csv" style="display: none;" onchange="handleCSVImport()">
+
+            <!-- Passwords List -->
+            <div id="passwordsList">
+                <div class="loading">Loading your passwords...</div>
+            </div>
+
+            <!-- Bottom Actions -->
+            <div style="margin-top: 20px;">
+                <div class="btn-row">
+                    <button class="btn btn-secondary" onclick="syncNow()" id="syncBtn">🔄 Sync</button>
+                    <button class="btn btn-danger" onclick="logout()">🔒 Lock</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Copy feedback -->
+    <div class="copy-feedback" id="copyFeedback">📋 Copied!</div>
 
     <script>
-        // State Management
-        let notes = [];
-        let currentNote = null;
-        let searchTerm = '';
-        let filterType = 'all';
-        let autoSaveTimer = null;
-        let saveStatusTimer = null;
-        let swipeNoteId = null;
-        let isProcessingInput = false;
+        let masterKey = null;
+        let passwords = [];
+        let githubConfig = null;
+        let filteredPasswords = [];
+        let lastSyncTime = null;
 
-        // Improved swipe state management
-        let touchStarted = false;
-        let isSwipeActive = false;
-        let startX = 0;
-        let startY = 0;
-        let currentX = 0;
-        let currentY = 0;
-        let swipeThreshold = 60;
-        let maxSwipeDistance = 120;
-        let minSwipeDistance = 15; // Minimum distance before we consider it a swipe
-        let swipeDirectionLocked = false;
-
-        // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
-            loadNotes();
-            renderNotesList();
-            
-            // Handle initial URL if there's a note hash
-            if (window.location.hash && window.location.hash.startsWith('#note-')) {
-                const noteId = window.location.hash.replace('#note-', '');
-                const note = notes.find(n => n.id === noteId);
-                if (note) {
-                    currentNote = note;
-                    openEditor();
-                } else {
-                    // Invalid note ID, go back to list
-                    history.replaceState({ view: 'list' }, '', window.location.pathname);
-                }
-            } else {
-                // Make sure we start with list state in history
-                history.replaceState({ view: 'list' }, '', window.location.pathname);
-            }
-            
-            // Event listeners
-            document.getElementById('searchBox').addEventListener('input', handleSearch);
-            document.getElementById('noteTitle').addEventListener('input', handleTitleChange);
-            
-            const noteContent = document.getElementById('noteContent');
-            noteContent.addEventListener('input', handleContentChange);
-            noteContent.addEventListener('keydown', handleKeyDown);
-            noteContent.addEventListener('paste', handlePaste);
-            
-            // Create some demo notes if none exist
-            if (notes.length === 0) {
-                createDemoNotes();
-                showSwipeHint();
+        // Load configuration on startup
+        window.addEventListener('load', () => {
+            const savedConfig = localStorage.getItem('githubConfig');
+            if (savedConfig) {
+                githubConfig = JSON.parse(savedConfig);
+                
+                // Clean any spaces
+                githubConfig.username = githubConfig.username.trim();
+                githubConfig.repo = githubConfig.repo.trim();
+                githubConfig.token = githubConfig.token.trim();
+                
+                localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
+                console.log('Loaded GitHub config:', githubConfig);
+                
+                document.getElementById('setupSection').style.display = 'none';
+                document.getElementById('authSection').classList.remove('hidden');
             }
         });
 
-        function createDemoNotes() {
-            const demoNotes = [
-                {
-                    id: generateId(),
-                    title: 'Welcome to Notes!',
-                    content: 'This is your new notes app with automatic formatting!\n\nTry typing:\n*bold text* and press space\n**italic text** and press space\n***bold italic*** and press space\n_underlined text_ and press space\n\nCombine them:\n_*bold underlined*_\n_**italic underlined**_\n_***bold italic underlined***_',
-                    createdAt: new Date().toISOString(),
-                    updatedAt: new Date().toISOString(),
-                    isPinned: false
-                },
-                {
-                    id: generateId(),
-                    title: 'Ideas',
-                    content: 'Random thoughts and ideas:\n1. Learn a new language\n2. Start a garden\n3. Write a blog\n4. Travel to Japan',
-                    createdAt: new Date(Date.now() - 3600000).toISOString(),
-                    updatedAt: new Date(Date.now() - 3600000).toISOString(),
-                    isPinned: true
-                },
-                {
-                    id: generateId(),
-                    title: 'Meeting Notes',
-                    content: 'Project kickoff meeting\n• Discussed timeline\n• Assigned roles\n• Set deadlines\n\nNext meeting: Friday',
-                    createdAt: new Date(Date.now() - 39600000).toISOString(),
-                    updatedAt: new Date(Date.now() - 39600000).toISOString(),
-                    isPinned: false
-                }
-            ];
+        // Password visibility toggle
+        function togglePasswordVisibility(inputId) {
+            const input = document.getElementById(inputId);
+            const toggle = input.nextElementSibling;
             
-            notes = demoNotes;
-            saveNotes();
-        }
-
-        function showSwipeHint() {
-            const hint = document.getElementById('swipeHint');
-            hint.classList.add('show');
-            setTimeout(() => {
-                hint.classList.remove('show');
-            }, 3000);
-        }
-
-        // Note Management Functions
-        function generateId() {
-            return Date.now().toString(36) + Math.random().toString(36).substr(2);
-        }
-
-        function createNewNote() {
-            const newNote = {
-                id: generateId(),
-                title: 'Untitled Note',
-                content: '',
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString(),
-                isPinned: false
-            };
-            
-            notes.unshift(newNote);
-            currentNote = newNote;
-            saveNotes();
-            renderNotesList();
-            openEditor(); // This will handle the history push
-        }
-
-        function selectNote(noteId) {
-            currentNote = notes.find(note => note.id === noteId);
-            if (!currentNote) return;
-            openEditor();
-        }
-
-        function openEditor() {
-            if (!currentNote) return;
-            
-            // Push a state to browser history so back button works
-            history.pushState({ view: 'editor', noteId: currentNote.id }, '', `#note-${currentNote.id}`);
-            
-            document.getElementById('sidebar').classList.add('hidden');
-            document.getElementById('editorContainer').classList.add('active');
-            document.getElementById('fab').classList.add('hidden');
-            
-            document.getElementById('noteTitle').value = currentNote.title;
-            const noteContent = document.getElementById('noteContent');
-            noteContent.innerHTML = '';
-            
-            // Convert plain text to formatted HTML
-            const formattedContent = convertTextToFormattedHTML(currentNote.content);
-            noteContent.innerHTML = formattedContent;
-            
-            document.getElementById('pinBtn').classList.toggle('active', currentNote.isPinned);
-            
-            updateCharCount();
-            updateLastSaved();
-            
-            // Removed auto-focus - user taps where they want to type
-        }
-
-        function closeEditor() {
-            document.getElementById('sidebar').classList.remove('hidden');
-            document.getElementById('editorContainer').classList.remove('active');
-            document.getElementById('fab').classList.remove('hidden');
-            renderNotesList();
-            
-            // Update URL to show we're back at notes list
-            if (window.location.hash) {
-                history.replaceState({ view: 'list' }, '', window.location.pathname);
+            if (input.type === 'password') {
+                input.type = 'text';
+                toggle.textContent = '🙈';
+            } else {
+                input.type = 'password';
+                toggle.textContent = '👁️';
             }
         }
 
-        function handleTitleChange(e) {
-            if (!currentNote) return;
-            currentNote.title = e.target.value || 'Untitled Note';
-            autoSave();
-        }
-
-        let formatTimer = null;
-
-        function handleContentChange(e) {
-            if (!currentNote || isProcessingInput) return;
+        // Password strength checker
+        function checkPasswordStrength(password) {
+            const indicator = document.getElementById('strengthIndicator');
+            if (!indicator) return;
             
-            // Update the note content immediately with plain text
-            currentNote.content = getPlainText();
-            updateCharCount();
-            autoSave();
+            let score = 0;
+            if (password.length >= 8) score++;
+            if (password.length >= 12) score++;
+            if (/[A-Z]/.test(password)) score++;
+            if (/[a-z]/.test(password)) score++;
+            if (/[0-9]/.test(password)) score++;
+            if (/[^A-Za-z0-9]/.test(password)) score++;
+            
+            indicator.style.width = Math.min(score * 20, 100) + '%';
+            
+            if (score < 3) {
+                indicator.className = 'password-strength strength-weak';
+            } else if (score < 5) {
+                indicator.className = 'password-strength strength-medium';
+            } else {
+                indicator.className = 'password-strength strength-strong';
+            }
         }
 
-        function handleKeyDown(e) {
-            // Handle Enter key for line breaks
-            if (e.key === 'Enter') {
-                e.preventDefault();
-                document.execCommand('insertHTML', false, '<br><br>');
-                triggerDelayedFormatting();
+        // GitHub connection test
+        async function testGitHubConnection() {
+            const username = document.getElementById('githubUsername').value.trim();
+            const repo = document.getElementById('repoName').value.trim();
+            const token = document.getElementById('githubToken').value.trim();
+
+            if (!username || !repo || !token) {
+                alert('Please fill in all fields first');
                 return;
             }
-            
-            // Handle Space - trigger formatting after space
-            if (e.key === ' ') {
-                setTimeout(() => triggerDelayedFormatting(), 50);
-                return;
-            }
-            
-            // Clear any pending formatting
-            clearTimeout(formatTimer);
-            
-            // Set a delayed formatting trigger
-            formatTimer = setTimeout(() => {
-                processFormatting();
-            }, 1500); // Only format after 1.5 seconds of no typing
-        }
 
-        function handlePaste(e) {
-            e.preventDefault();
-            const text = (e.originalEvent || e).clipboardData.getData('text/plain');
-            document.execCommand('insertText', false, text);
-            triggerDelayedFormatting();
-        }
+            const testConfig = { username, repo, token };
+            const originalConfig = githubConfig;
+            githubConfig = testConfig;
 
-        function triggerDelayedFormatting() {
-            clearTimeout(formatTimer);
-            formatTimer = setTimeout(() => {
-                processFormatting();
-            }, 300);
-        }
-
-        function getPlainText() {
-            const noteContent = document.getElementById('noteContent');
-            return noteContent.innerText || noteContent.textContent || '';
-        }
-
-        function processFormatting() {
-            if (isProcessingInput) return;
-            isProcessingInput = true;
-            
-            const noteContent = document.getElementById('noteContent');
-            const selection = window.getSelection();
-            const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-            
-            // Get current cursor position
-            let cursorPosition = 0;
-            if (range) {
-                const preCaretRange = range.cloneRange();
-                preCaretRange.selectNodeContents(noteContent);
-                preCaretRange.setEnd(range.endContainer, range.endOffset);
-                cursorPosition = preCaretRange.toString().length;
-            }
-            
-            // Get plain text content
-            const plainText = getPlainText();
-            
-            // Only process if there are formatting characters to avoid unnecessary updates
-            if (!/[*_]/.test(plainText)) {
-                isProcessingInput = false;
-                return;
-            }
-            
-            // Convert to formatted HTML
-            const formattedHTML = convertTextToFormattedHTML(plainText);
-            
-            // Only update if content actually changed
-            if (noteContent.innerHTML !== formattedHTML) {
-                noteContent.innerHTML = formattedHTML;
+            try {
+                updateSyncStatus('🔄 Testing...', 'sync-offline');
                 
-                // Restore cursor position
-                restoreCursorPosition(noteContent, cursorPosition);
-            }
-            
-            // Update the note content
-            currentNote.content = plainText;
-            
-            isProcessingInput = false;
-        }
-
-        function convertTextToFormattedHTML(text) {
-            // Escape HTML first
-            let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            
-            // Handle line breaks
-            html = html.replace(/\n/g, '<br>');
-            
-            // Process formatting patterns in order of specificity (most specific first)
-            // We need to handle the most complex patterns first to avoid conflicts
-            
-            // _***text***_ = bold + italic + underline  
-            html = html.replace(/_\*\*\*([^*_]+)\*\*\*_/g, '<span class="bold-italic-underline">$1</span>');
-            
-            // _**text**_ = italic + underline
-            html = html.replace(/_\*\*([^*_]+)\*\*_/g, '<span class="italic-underline">$1</span>');
-            
-            // _*text*_ = bold + underline  
-            html = html.replace(/_\*([^*_]+)\*_/g, '<span class="bold-underline">$1</span>');
-            
-            // ***text*** = bold + italic
-            html = html.replace(/\*\*\*([^*_]+)\*\*\*/g, '<span class="bold-italic">$1</span>');
-            
-            // **text** = italic  
-            html = html.replace(/\*\*([^*_]+)\*\*/g, '<span class="italic">$1</span>');
-            
-            // *text* = bold
-            html = html.replace(/\*([^*_]+)\*/g, '<span class="bold">$1</span>');
-            
-            // _text_ = underline
-            html = html.replace(/_([^*_]+)_/g, '<span class="underline">$1</span>');
-            
-            return html;
-        }
-
-        function restoreCursorPosition(element, position) {
-            const walker = document.createTreeWalker(
-                element,
-                NodeFilter.SHOW_TEXT,
-                null,
-                false
-            );
-            
-            let currentPosition = 0;
-            let node;
-            
-            while (node = walker.nextNode()) {
-                const nodeLength = node.textContent.length;
-                if (currentPosition + nodeLength >= position) {
-                    const range = document.createRange();
-                    const selection = window.getSelection();
-                    
-                    range.setStart(node, position - currentPosition);
-                    range.collapse(true);
-                    
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-                    break;
-                }
-                currentPosition += nodeLength;
-            }
-        }
-
-        function autoSave() {
-            clearTimeout(autoSaveTimer);
-            showSaveStatus('saving');
-            
-            autoSaveTimer = setTimeout(() => {
-                if (currentNote) {
-                    currentNote.updatedAt = new Date().toISOString();
-                    const saved = saveNotes();
-                    if (saved) {
-                        updateLastSaved();
-                        showSaveStatus('saved');
-                    } else {
-                        showSaveStatus('error');
+                const repoInfo = await fetch(`https://api.github.com/repos/${username}/${repo}`, {
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json'
                     }
+                });
+
+                if (!repoInfo.ok) {
+                    throw new Error(`Repository access failed: ${repoInfo.status}`);
                 }
-            }, 1000);
-        }
 
-        function togglePin() {
-            if (!currentNote) return;
-            currentNote.isPinned = !currentNote.isPinned;
-            document.getElementById('pinBtn').classList.toggle('active', currentNote.isPinned);
-            saveNotes();
-        }
+                const testFileContent = btoa('test');
+                const writeTestResponse = await fetch(`https://api.github.com/repos/${username}/${repo}/contents/.test-file`, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: 'Test file',
+                        content: testFileContent
+                    })
+                });
 
-        function deleteNoteById(noteId) {
-            swipeNoteId = noteId;
-            document.getElementById('deleteModal').classList.add('show');
-        }
+                if (!writeTestResponse.ok) {
+                    throw new Error('Cannot write to repository. Check token permissions.');
+                }
 
-        function confirmDelete() {
-            if (!swipeNoteId) return;
-            
-            // Remove the note from array
-            notes = notes.filter(note => note.id !== swipeNoteId);
-            saveNotes();
-            
-            // If deleting current note in editor, close editor and update history
-            if (currentNote && currentNote.id === swipeNoteId) {
-                currentNote = null;
-                closeEditor();
-                // Replace the current history state to prevent going back to deleted note
-                history.replaceState({ view: 'list' }, '', window.location.pathname);
-            }
-            
-            // Close modal and reset
-            const modal = document.getElementById('deleteModal');
-            modal.classList.remove('show');
-            swipeNoteId = null;
-            
-            // Re-render the list
-            renderNotesList();
-        }
+                // Cleanup
+                const testFileInfo = await writeTestResponse.json();
+                await fetch(`https://api.github.com/repos/${username}/${repo}/contents/.test-file`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        message: 'Clean up test file',
+                        sha: testFileInfo.content.sha
+                    })
+                });
 
-        // Improved swipe handling functions
-        function handleTouchStart(e, noteId) {
-            // Reset all swipe states
-            touchStarted = true;
-            isSwipeActive = false;
-            swipeDirectionLocked = false;
-            
-            const touch = e.touches[0];
-            startX = touch.clientX;
-            startY = touch.clientY;
-            currentX = startX;
-            currentY = startY;
-            
-            swipeNoteId = noteId;
-            
-            // Don't add swiping class or prevent anything yet - wait to see direction
-        }
-
-        function handleTouchMove(e) {
-            if (!touchStarted) return;
-            
-            const touch = e.touches[0];
-            currentX = touch.clientX;
-            currentY = touch.clientY;
-            
-            const deltaX = startX - currentX;
-            const deltaY = Math.abs(currentY - startY);
-            const absDeltaX = Math.abs(deltaX);
-            
-            // If we haven't determined direction yet and movement is significant enough
-            if (!swipeDirectionLocked && (absDeltaX > minSwipeDistance || deltaY > minSwipeDistance)) {
-                swipeDirectionLocked = true;
+                updateSyncStatus('✅ Connected', 'sync-online');
+                alert('✅ Connection successful! You can now save your configuration.');
                 
-                // Check if movement is more horizontal than vertical and moving left
-                if (absDeltaX > deltaY && deltaX > 0) {
-                    // This is a horizontal swipe left - activate swipe mode
-                    isSwipeActive = true;
-                    const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
-                    const noteItem = noteContainer ? noteContainer.querySelector('.note-item') : null;
-                    if (noteItem) {
-                        noteItem.classList.add('swiping');
-                    }
+                // Auto-save and proceed
+                githubConfig = testConfig;
+                localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
+                document.getElementById('setupSection').style.display = 'none';
+                document.getElementById('createPasswordSection').classList.remove('hidden');
+
+            } catch (error) {
+                console.error('Connection test failed:', error);
+                alert(`❌ Connection failed: ${error.message}`);
+                updateSyncStatus('❌ Failed', 'sync-offline');
+            } finally {
+                if (!githubConfig || githubConfig === originalConfig) {
+                    githubConfig = originalConfig;
+                }
+            }
+        }
+
+        // Save GitHub configuration
+        async function saveGitHubConfig() {
+            const username = document.getElementById('githubUsername').value.trim();
+            const repo = document.getElementById('repoName').value.trim();
+            const token = document.getElementById('githubToken').value.trim();
+
+            if (!username || !repo || !token) {
+                alert('Please fill in all fields');
+                return;
+            }
+
+            if (username.includes(' ') || repo.includes(' ')) {
+                alert('GitHub username and repository name cannot contain spaces');
+                return;
+            }
+
+            githubConfig = { username, repo, token };
+            localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
+
+            document.getElementById('setupSection').style.display = 'none';
+            updateSyncStatus('🔄 Checking vault...', 'sync-offline');
+            
+            try {
+                const vaultCheck = await githubApiCall('contents/passwords.json');
+                document.getElementById('authSection').classList.remove('hidden');
+                updateSyncStatus('🔐 Vault found', 'sync-offline');
+            } catch (error) {
+                if (error.message.includes('404')) {
+                    document.getElementById('createPasswordSection').classList.remove('hidden');
+                    updateSyncStatus('🆕 New vault', 'sync-offline');
                 } else {
-                    // This is vertical scrolling or horizontal swipe right - don't interfere
-                    touchStarted = false;
-                    swipeNoteId = null;
+                    document.getElementById('createPasswordSection').classList.remove('hidden');
+                    updateSyncStatus('❓ Choose option', 'sync-offline');
+                }
+            }
+        }
+
+        function skipGitHubCheck() {
+            const username = document.getElementById('githubUsername').value.trim();
+            const repo = document.getElementById('repoName').value.trim();
+            const token = document.getElementById('githubToken').value.trim();
+
+            if (!username || !repo || !token) {
+                alert('Please fill in all GitHub fields first');
+                return;
+            }
+
+            githubConfig = { username, repo, token };
+            localStorage.setItem('githubConfig', JSON.stringify(githubConfig));
+
+            document.getElementById('setupSection').style.display = 'none';
+            document.getElementById('createPasswordSection').classList.remove('hidden');
+            updateSyncStatus('🆕 Ready to create', 'sync-offline');
+        }
+
+        function switchToLogin() {
+            document.getElementById('createPasswordSection').style.display = 'none';
+            document.getElementById('authSection').classList.remove('hidden');
+            updateSyncStatus('🔐 Ready to unlock', 'sync-offline');
+        }
+
+        function switchToCreate() {
+            document.getElementById('authSection').style.display = 'none';
+            document.getElementById('createPasswordSection').classList.remove('hidden');
+            updateSyncStatus('🆕 Ready to create', 'sync-offline');
+        }
+
+        // Encryption functions
+        async function deriveKey(password, salt) {
+            const encoder = new TextEncoder();
+            const keyMaterial = await window.crypto.subtle.importKey(
+                'raw',
+                encoder.encode(password),
+                'PBKDF2',
+                false,
+                ['deriveKey']
+            );
+
+            return window.crypto.subtle.deriveKey(
+                {
+                    name: 'PBKDF2',
+                    salt: salt,
+                    iterations: 100000,
+                    hash: 'SHA-256'
+                },
+                keyMaterial,
+                { name: 'AES-GCM', length: 256 },
+                false,
+                ['encrypt', 'decrypt']
+            );
+        }
+
+        async function encrypt(text, key) {
+            const encoder = new TextEncoder();
+            const iv = window.crypto.getRandomValues(new Uint8Array(12));
+            
+            const encrypted = await window.crypto.subtle.encrypt(
+                { name: 'AES-GCM', iv: iv },
+                key,
+                encoder.encode(text)
+            );
+
+            return {
+                iv: Array.from(iv),
+                data: Array.from(new Uint8Array(encrypted))
+            };
+        }
+
+        async function decrypt(encryptedData, key) {
+            const iv = new Uint8Array(encryptedData.iv);
+            const data = new Uint8Array(encryptedData.data);
+
+            const decrypted = await window.crypto.subtle.decrypt(
+                { name: 'AES-GCM', iv: iv },
+                key,
+                data
+            );
+
+            return new TextDecoder().decode(decrypted);
+        }
+
+        // GitHub API functions
+        async function githubApiCall(endpoint, method = 'GET', data = null) {
+            const url = `https://api.github.com/repos/${githubConfig.username}/${githubConfig.repo}/${endpoint}`;
+            
+            const options = {
+                method,
+                headers: {
+                    'Authorization': `token ${githubConfig.token}`,
+                    'Accept': 'application/vnd.github.v3+json',
+                    'Content-Type': 'application/json'
+                }
+            };
+
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+
+            const response = await fetch(url, options);
+            
+            if (!response.ok) {
+                const errorText = await response.text();
+                throw new Error(`GitHub API error: ${response.status} ${response.statusText} - ${errorText}`);
+            }
+
+            return response.json();
+        }
+
+        async function loadPasswordsFromGitHub() {
+            try {
+                updateSyncStatus('🔄 Syncing...', 'sync-offline');
+                
+                const fileData = await githubApiCall('contents/passwords.json');
+                const encryptedContent = atob(fileData.content);
+                const encryptedData = JSON.parse(encryptedContent);
+                
+                const decryptedData = await decrypt(encryptedData, masterKey);
+                passwords = JSON.parse(decryptedData);
+                lastSyncTime = new Date();
+                
+                updateSyncStatus('🟢 Synced', 'sync-online');
+            } catch (error) {
+                if (error.message.includes('404')) {
+                    passwords = [];
+                    await savePasswordsToGitHub();
+                } else {
+                    console.error('Failed to load from GitHub:', error);
+                    updateSyncStatus('🔴 Sync Error', 'sync-offline');
+                    throw error;
+                }
+            }
+        }
+
+        async function savePasswordsToGitHub() {
+            try {
+                updateSyncStatus('🔄 Saving...', 'sync-offline');
+                
+                const dataToEncrypt = JSON.stringify(passwords);
+                const encrypted = await encrypt(dataToEncrypt, masterKey);
+                const encryptedContent = JSON.stringify(encrypted);
+                
+                // Always fetch the latest SHA to avoid conflicts
+                let sha = null;
+                try {
+                    const existingFile = await githubApiCall('contents/passwords.json');
+                    sha = existingFile.sha;
+                } catch (e) {
+                    // File doesn't exist, that's ok
+                }
+                
+                const commitData = {
+                    message: `Update passwords - ${new Date().toISOString()}`,
+                    content: btoa(encryptedContent)
+                };
+                
+                if (sha) {
+                    commitData.sha = sha;
+                }
+                
+                await githubApiCall('contents/passwords.json', 'PUT', commitData);
+                lastSyncTime = new Date();
+                updateSyncStatus('🟢 Synced', 'sync-online');
+            } catch (error) {
+                console.error('Failed to save to GitHub:', error);
+                updateSyncStatus('🔴 Sync Error', 'sync-offline');
+                
+                // If it's a SHA conflict, try once more with fresh SHA
+                if (error.message.includes('409') || error.message.includes('does not match')) {
+                    console.log('SHA conflict detected, retrying with fresh SHA...');
+                    try {
+                        const freshFile = await githubApiCall('contents/passwords.json');
+                        const commitData = {
+                            message: `Update passwords - ${new Date().toISOString()} (retry)`,
+                            content: btoa(JSON.stringify(await encrypt(JSON.stringify(passwords), masterKey))),
+                            sha: freshFile.sha
+                        };
+                        
+                        await githubApiCall('contents/passwords.json', 'PUT', commitData);
+                        lastSyncTime = new Date();
+                        updateSyncStatus('🟢 Synced', 'sync-online');
+                        return; // Success on retry
+                    } catch (retryError) {
+                        console.error('Retry also failed:', retryError);
+                        updateSyncStatus('🔴 Sync Error', 'sync-offline');
+                    }
+                }
+                
+                throw error;
+            }
+        }
+
+        function updateSyncStatus(text, className) {
+            const statusElement = document.getElementById('syncStatus');
+            statusElement.textContent = text;
+            statusElement.className = `sync-status ${className}`;
+        }
+
+        async function createMasterPassword() {
+            const newPassword = document.getElementById('newMasterPassword').value;
+            const confirmPassword = document.getElementById('confirmMasterPassword').value;
+
+            if (!newPassword || !confirmPassword) {
+                alert('Please fill in both password fields');
+                return;
+            }
+
+            if (newPassword !== confirmPassword) {
+                alert('Passwords do not match');
+                return;
+            }
+
+            if (newPassword.length < 8) {
+                alert('Master password must be at least 8 characters long');
+                return;
+            }
+
+            const createBtn = document.getElementById('createBtn');
+            createBtn.disabled = true;
+            createBtn.innerHTML = '🔄 Creating Vault...';
+
+            try {
+                const salt = new TextEncoder().encode('password-manager-salt-2024');
+                masterKey = await deriveKey(newPassword, salt);
+                
+                passwords = [];
+                await savePasswordsToGitHub();
+                
+                document.getElementById('createPasswordSection').style.display = 'none';
+                document.getElementById('mainSection').classList.remove('hidden');
+                
+                document.getElementById('newMasterPassword').value = '';
+                document.getElementById('confirmMasterPassword').value = '';
+                
+                displayPasswords();
+            } catch (error) {
+                alert('Failed to create vault. Please try again.');
+                console.error(error);
+            } finally {
+                createBtn.disabled = false;
+                createBtn.innerHTML = '🔑 Create Vault';
+            }
+        }
+
+        async function authenticate() {
+            const masterPassword = document.getElementById('masterPassword').value;
+            if (!masterPassword) {
+                alert('Please enter a master password');
+                return;
+            }
+
+            const unlockBtn = document.getElementById('unlockBtn');
+            unlockBtn.disabled = true;
+            unlockBtn.innerHTML = '🔄 Unlocking...';
+
+            try {
+                const salt = new TextEncoder().encode('password-manager-salt-2024');
+                masterKey = await deriveKey(masterPassword, salt);
+                
+                await loadPasswordsFromGitHub();
+                
+                document.getElementById('authSection').style.display = 'none';
+                document.getElementById('mainSection').classList.remove('hidden');
+                document.getElementById('masterPassword').value = '';
+                
+                displayPasswords();
+            } catch (error) {
+                alert('Failed to unlock vault. Please check your master password.');
+                console.error(error);
+            } finally {
+                unlockBtn.disabled = false;
+                unlockBtn.innerHTML = '🔓 Unlock Vault';
+            }
+        }
+
+        // Toggle add form visibility
+        function toggleAddForm() {
+            const form = document.getElementById('addPasswordForm');
+            const btn = document.getElementById('toggleAddBtn');
+            
+            if (form.classList.contains('hidden')) {
+                form.classList.remove('hidden');
+                btn.textContent = '➖ Hide Add Form';
+            } else {
+                form.classList.add('hidden');
+                btn.textContent = '➕ Add New Password';
+                
+                // Clear form when hiding
+                document.getElementById('siteName').value = '';
+                document.getElementById('siteUrl').value = '';
+                document.getElementById('username').value = '';
+                document.getElementById('password').value = '';
+            }
+        }
+
+        async function addPassword() {
+            const siteName = document.getElementById('siteName').value.trim();
+            const siteUrl = document.getElementById('siteUrl').value.trim();
+            const username = document.getElementById('username').value.trim();
+            const password = document.getElementById('password').value;
+
+            if (!siteName || !username || !password) {
+                alert('Please fill in site name, username, and password');
+                return;
+            }
+
+            const addBtn = document.getElementById('addBtn');
+            addBtn.disabled = true;
+            addBtn.innerHTML = '💾 Saving...';
+
+            try {
+                passwords.push({
+                    siteName,
+                    siteUrl,
+                    username,
+                    password,
+                    dateAdded: new Date().toISOString()
+                });
+
+                await savePasswordsToGitHub();
+                displayPasswords();
+
+                // Clear form
+                document.getElementById('siteName').value = '';
+                document.getElementById('siteUrl').value = '';
+                document.getElementById('username').value = '';
+                document.getElementById('password').value = '';
+
+                showCopyFeedback('✅ Password saved!');
+                
+                // Hide the add form after saving
+                document.getElementById('addPasswordForm').classList.add('hidden');
+                document.getElementById('toggleAddBtn').textContent = '➕ Add New Password';
+            } catch (error) {
+                alert('Failed to save password. Please try again.');
+                passwords.pop();
+            } finally {
+                addBtn.disabled = false;
+                addBtn.innerHTML = '💾 Save';
+            }
+        }
+
+        function generatePassword() {
+            const length = 16;
+            const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:,.<>?';
+            let password = '';
+            
+            for (let i = 0; i < length; i++) {
+                password += charset.charAt(Math.floor(Math.random() * charset.length));
+            }
+            
+            document.getElementById('password').value = password;
+            showCopyFeedback('🎲 Password generated!');
+        }
+
+        // CSV Import/Export Functions
+        async function handleCSVImport() {
+            const file = document.getElementById('csvImport').files[0];
+            if (!file) return;
+
+            try {
+                console.log('Starting CSV import...');
+                
+                // First sync to get latest data and avoid conflicts
+                console.log('Syncing before import...');
+                await loadPasswordsFromGitHub();
+                
+                const text = await file.text();
+                console.log('File content loaded, parsing...');
+                
+                const importedPasswords = parseCSV(text);
+                
+                if (importedPasswords.length === 0) {
+                    alert('No valid passwords found in CSV file.\n\nExpected format:\nname,website,username,secondary_username,password,notes');
                     return;
                 }
+
+                const confirmMessage = `Import ${importedPasswords.length} passwords?\n\nThis will add them to your existing passwords.`;
+                
+                if (!confirm(confirmMessage)) return;
+
+                console.log('User confirmed import, adding passwords...');
+                
+                // Add imported passwords to existing ones
+                const originalLength = passwords.length;
+                passwords.push(...importedPasswords);
+                
+                console.log('Saving to GitHub...');
+                await savePasswordsToGitHub();
+                
+                console.log('Refreshing display...');
+                displayPasswords();
+                
+                alert(`✅ Successfully imported ${importedPasswords.length} passwords!\n\nTotal passwords: ${passwords.length}`);
+                console.log('Import completed successfully');
+                
+            } catch (error) {
+                console.error('Import failed:', error);
+                alert(`❌ Import failed: ${error.message}`);
             }
             
-            // Only process swipe if we're in active swipe mode
-            if (isSwipeActive) {
-                e.preventDefault(); // Only prevent default when we're sure it's a swipe
-                
-                // Apply visual feedback for the swipe
-                if (deltaX > 0) {
-                    const swipeDistance = Math.min(deltaX, maxSwipeDistance);
-                    const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
-                    const noteItem = noteContainer ? noteContainer.querySelector('.note-item') : null;
-                    
-                    if (noteItem) {
-                        noteItem.style.transform = `translateX(-${swipeDistance}px)`;
-                        
-                        if (deltaX > swipeThreshold * 0.7) {
-                            noteItem.style.transition = 'none';
-                        }
-                    }
-                }
-            }
+            // Clear the file input
+            document.getElementById('csvImport').value = '';
         }
 
-        function handleTouchEnd(e) {
-            if (!touchStarted) return;
+        function parseCSV(csvText) {
+            const lines = csvText.trim().split('\n');
+            if (lines.length < 2) {
+                throw new Error('CSV file must have at least a header and one data row');
+            }
             
-            const deltaX = startX - currentX;
-            const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
-            const noteItem = noteContainer ? noteContainer.querySelector('.note-item') : null;
+            const headers = lines[0].split(',').map(h => h.trim().toLowerCase());
+            console.log('CSV Headers found:', headers);
             
-            if (isSwipeActive && noteItem) {
-                noteItem.classList.remove('swiping');
+            // Your format: name,website,username,secondary_username,password,notes
+            // Map to expected positions
+            const nameIndex = 0;      // name
+            const websiteIndex = 1;   // website  
+            const usernameIndex = 2;  // username
+            const passwordIndex = 4;  // password (skip secondary_username at index 3)
+            const notesIndex = 5;     // notes (optional)
+            
+            const passwords = [];
+            
+            for (let i = 1; i < lines.length; i++) {
+                const line = lines[i].trim();
+                if (!line) continue;
                 
-                if (deltaX > swipeThreshold) {
-                    // Swipe was far enough - trigger delete
-                    noteItem.style.transition = 'transform 0.2s ease-out';
-                    noteItem.style.transform = `translateX(-${maxSwipeDistance}px)`;
-                    
-                    setTimeout(() => {
-                        deleteNoteById(swipeNoteId);
-                    }, 100);
+                const columns = parseCSVLine(line);
+                console.log(`Processing row ${i}:`, columns);
+                
+                if (columns.length < 5) {
+                    console.warn(`Skipping row ${i}: not enough columns (need at least 5, got ${columns.length})`);
+                    continue;
+                }
+                
+                const siteName = columns[nameIndex]?.trim();
+                const website = columns[websiteIndex]?.trim();
+                const username = columns[usernameIndex]?.trim();
+                const password = columns[passwordIndex]?.trim();
+                
+                if (!siteName || !username || !password) {
+                    console.warn(`Skipping row ${i}: missing required fields`, { siteName, username, password: password ? '[present]' : '[missing]' });
+                    continue;
+                }
+                
+                const passwordEntry = {
+                    siteName,
+                    username,
+                    password,
+                    dateAdded: new Date().toISOString()
+                };
+                
+                // Add website URL if available
+                if (website) {
+                    let url = website;
+                    if (url && !url.startsWith('http')) {
+                        url = 'https://' + url;
+                    }
+                    passwordEntry.siteUrl = url;
+                }
+                
+                passwords.push(passwordEntry);
+                console.log(`Added password for: ${siteName}`);
+            }
+            
+            console.log(`Successfully parsed ${passwords.length} passwords from CSV`);
+            return passwords;
+        }
+
+        function parseCSVLine(line) {
+            const result = [];
+            let current = '';
+            let inQuotes = false;
+            
+            for (let i = 0; i < line.length; i++) {
+                const char = line[i];
+                
+                if (char === '"') {
+                    inQuotes = !inQuotes;
+                } else if (char === ',' && !inQuotes) {
+                    result.push(current.trim());
+                    current = '';
                 } else {
-                    // Swipe wasn't far enough - snap back
-                    noteItem.style.transition = 'transform 0.2s ease-out';
-                    noteItem.style.transform = 'translateX(0px)';
-                    
-                    setTimeout(() => {
-                        if (noteItem) {
-                            noteItem.style.transition = '';
-                        }
-                    }, 250);
+                    current += char;
                 }
-            } else if (!isSwipeActive && swipeNoteId && deltaX <= minSwipeDistance) {
-                // This was a tap, not a swipe - handle the note click
-                selectNote(swipeNoteId);
             }
             
-            // Reset all states
-            touchStarted = false;
-            isSwipeActive = false;
-            swipeDirectionLocked = false;
-            if (deltaX <= swipeThreshold) {
-                swipeNoteId = null;
-            }
+            result.push(current.trim());
+            return result;
         }
 
-        function cancelSwipe() {
-            if (!touchStarted) return;
-            
-            const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
-            const noteItem = noteContainer ? noteContainer.querySelector('.note-item') : null;
-            
-            if (noteItem) {
-                noteItem.classList.remove('swiping');
-                noteItem.style.transition = 'transform 0.2s ease-out';
-                noteItem.style.transform = 'translateX(0px)';
-                
-                setTimeout(() => {
-                    if (noteItem) {
-                        noteItem.style.transition = '';
-                    }
-                }, 250);
-            }
-            
-            touchStarted = false;
-            isSwipeActive = false;
-            swipeDirectionLocked = false;
-            swipeNoteId = null;
-        }
-
-        function handleNoteClick(e, noteId) {
-            // Only handle click if we're not in the middle of a swipe
-            if (isSwipeActive) {
-                e.preventDefault();
+        function exportCSV() {
+            if (passwords.length === 0) {
+                alert('No passwords to export');
                 return;
             }
-            selectNote(noteId);
-        }
 
-        // Search and Filter
-        function handleSearch(e) {
-            searchTerm = e.target.value.toLowerCase();
-            renderNotesList();
-        }
+            const csvContent = [
+                'name,website,username,password,notes',
+                ...passwords.map(p => {
+                    const name = (p.siteName || '').replace(/,/g, '');
+                    const website = (p.siteUrl || '').replace(/,/g, '');
+                    const username = (p.username || '').replace(/,/g, '');
+                    const password = (p.password || '').replace(/,/g, '');
+                    const notes = `Added: ${new Date(p.dateAdded).toLocaleDateString()}`;
+                    
+                    return `"${name}","${website}","${username}","${password}","${notes}"`;
+                })
+            ].join('\n');
 
-        function filterNotes(type) {
-            filterType = type;
-            document.querySelectorAll('.filter-btn').forEach(btn => {
-                btn.classList.remove('active');
-            });
-            event.target.classList.add('active');
-            renderNotesList();
-        }
-
-        // UI Functions
-        function renderNotesList() {
-            const notesList = document.getElementById('notesList');
-            let filteredNotes = notes;
+            const blob = new Blob([csvContent], { type: 'text/csv' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `passwords-export-${new Date().toISOString().split('T')[0]}.csv`;
+            a.click();
+            URL.revokeObjectURL(url);
             
-            if (filterType === 'pinned') {
-                filteredNotes = filteredNotes.filter(note => note.isPinned);
-            }
+            showCopyFeedback('📤 CSV exported!');
+        }
+
+        function filterPasswords() {
+            const query = document.getElementById('searchInput').value.toLowerCase();
+            const clearBtn = document.getElementById('clearSearch');
             
-            if (searchTerm) {
-                filteredNotes = filteredNotes.filter(note => 
-                    note.title.toLowerCase().includes(searchTerm) ||
-                    note.content.toLowerCase().includes(searchTerm)
+            if (query) {
+                clearBtn.classList.remove('hidden');
+                filteredPasswords = passwords.filter(p => 
+                    p.siteName.toLowerCase().includes(query) ||
+                    p.username.toLowerCase().includes(query) ||
+                    (p.siteUrl && p.siteUrl.toLowerCase().includes(query))
                 );
+            } else {
+                clearBtn.classList.add('hidden');
+                filteredPasswords = [];
             }
             
-            filteredNotes.sort((a, b) => {
-                if (a.isPinned && !b.isPinned) return -1;
-                if (!a.isPinned && b.isPinned) return 1;
-                return new Date(b.updatedAt) - new Date(a.updatedAt);
-            });
-            
-            notesList.innerHTML = '';
-            
-            if (filteredNotes.length === 0) {
-                notesList.innerHTML = `
+            displayPasswords();
+        }
+
+        function clearSearch() {
+            document.getElementById('searchInput').value = '';
+            document.getElementById('clearSearch').classList.add('hidden');
+            filteredPasswords = [];
+            displayPasswords();
+        }
+
+        async function syncNow() {
+            const syncBtn = document.getElementById('syncBtn');
+            syncBtn.disabled = true;
+            syncBtn.innerHTML = '🔄 Syncing...';
+
+            try {
+                await loadPasswordsFromGitHub();
+                displayPasswords();
+                showCopyFeedback('🔄 Synced successfully!');
+            } catch (error) {
+                alert('Sync failed. Please check your internet connection.');
+            } finally {
+                syncBtn.disabled = false;
+                syncBtn.innerHTML = '🔄 Sync';
+            }
+        }
+
+        function logout() {
+            if (confirm('Lock your vault? You\'ll need to enter your master password again.')) {
+                masterKey = null;
+                passwords = [];
+                filteredPasswords = [];
+                lastSyncTime = null;
+                
+                document.getElementById('authSection').classList.remove('hidden');
+                document.getElementById('mainSection').style.display = 'none';
+                updateSyncStatus('🔒 Locked', 'sync-offline');
+                
+                // Clear search
+                document.getElementById('searchInput').value = '';
+                document.getElementById('clearSearch').classList.add('hidden');
+            }
+        }
+
+        function displayPasswords() {
+            const container = document.getElementById('passwordsList');
+            const toShow = filteredPasswords.length > 0 ? filteredPasswords : passwords;
+
+            if (toShow.length === 0) {
+                container.innerHTML = `
                     <div class="empty-state">
-                        <div class="empty-state-icon">📝</div>
-                        <div class="empty-state-text">No notes found</div>
-                        <div class="empty-state-subtext">Tap the + button to create your first note</div>
+                        <div class="empty-state-icon">🔑</div>
+                        <strong>No passwords yet</strong><br>
+                        <small>Add your first password above to get started!</small>
                     </div>
                 `;
                 return;
             }
+
+            // Create grid container
+            const gridContainer = document.createElement('div');
+            gridContainer.className = 'passwords-grid';
             
-            filteredNotes.forEach(note => {
-                const noteContainer = document.createElement('div');
-                noteContainer.className = 'note-swipe-container';
-                noteContainer.dataset.noteId = note.id;
+            toShow.forEach((item, index) => {
+                const actualIndex = passwords.indexOf(item);
+                const firstLetter = item.siteName.charAt(0).toUpperCase();
                 
-                // Strip formatting for preview
-                const preview = note.content.replace(/[*_]/g, '').substring(0, 100);
-                
-                noteContainer.innerHTML = `
-                    <div class="note-swipe-background">
-                        🗑️
+                const div = document.createElement('div');
+                div.className = 'password-item';
+                div.dataset.index = actualIndex;
+                div.innerHTML = `
+                    <button class="delete-icon" title="Delete password">🗑️</button>
+                    <div class="swipe-indicator">Release to delete</div>
+                    <h3>
+                        <span class="site-icon">${firstLetter}</span>
+                        ${item.siteName}
+                    </h3>
+                    <p><strong>👤</strong> ${item.username}</p>
+                    <div class="password-display hidden" id="pass-${actualIndex}">
+                        <strong>🔑</strong> ${item.password}
                     </div>
-                    <div class="note-item ${note.isPinned ? 'pinned' : ''}">
-                        <div class="note-item-header">
-                            <div class="note-item-title">${note.title}</div>
-                            <div class="note-item-icons">
-                                ${note.isPinned ? '<span class="pin-icon pinned">📌</span>' : ''}
-                            </div>
-                        </div>
-                        <div class="note-item-preview">${preview}${note.content.length > 100 ? '...' : ''}</div>
-                        <div class="note-item-meta">${formatDate(note.updatedAt)}</div>
-                    </div>
+                    <p style="color: #7f8c8d; font-size: 0.8rem; margin-top: 8px;">
+                        💡 Click to copy • Hold to reveal
+                    </p>
                 `;
                 
-                noteContainer.addEventListener('touchstart', (e) => handleTouchStart(e, note.id), { passive: false });
-                noteContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
-                noteContainer.addEventListener('touchend', handleTouchEnd, { passive: false });
-                noteContainer.addEventListener('click', (e) => handleNoteClick(e, note.id));
+                // Add interaction handlers
+                setupPasswordItemInteractions(div, actualIndex, item.password);
                 
-                notesList.appendChild(noteContainer);
+                gridContainer.appendChild(div);
             });
-        }
-
-        function showSaveStatus(status) {
-            const saveStatus = document.getElementById('saveStatus');
-            const statusText = {
-                'saving': 'Saving...',
-                'saved': 'Saved!',
-                'error': 'Save failed'
-            };
             
-            saveStatus.textContent = statusText[status];
-            saveStatus.className = `save-status show ${status}`;
+            container.innerHTML = '';
+            container.appendChild(gridContainer);
+        }
+
+        function setupPasswordItemInteractions(element, index, password) {
+            const deleteBtn = element.querySelector('.delete-icon');
+            const passwordDisplay = element.querySelector('.password-display');
             
-            clearTimeout(saveStatusTimer);
-            if (status !== 'saving') {
-                saveStatusTimer = setTimeout(() => {
-                    saveStatus.classList.remove('show');
-                }, 2000);
-            }
-        }
-
-        function updateCharCount() {
-            const content = document.getElementById('noteContent').innerText || '';
-            document.getElementById('charCount').textContent = `${content.length} characters`;
-        }
-
-        function updateLastSaved() {
-            document.getElementById('lastSaved').textContent = 'Auto-saved';
-        }
-
-        function formatDate(dateString) {
-            const date = new Date(dateString);
-            const now = new Date();
-            const diff = now - date;
-            
-            if (diff < 60000) return 'Just now';
-            if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
-            if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
-            if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
-            
-            return date.toLocaleDateString();
-        }
-
-        // Storage Functions
-        function saveNotes() {
-            try {
-                localStorage.setItem('notes', JSON.stringify(notes));
-                return true;
-            } catch (e) {
-                console.error('Failed to save notes:', e);
+            // Prevent context menu on long press
+            element.addEventListener('contextmenu', (e) => {
+                e.preventDefault();
                 return false;
-            }
-        }
-
-        function loadNotes() {
-            try {
-                const savedNotes = localStorage.getItem('notes');
-                if (savedNotes) {
-                    notes = JSON.parse(savedNotes);
-                }
-            } catch (e) {
-                console.error('Failed to load notes:', e);
-                notes = [];
-            }
-        }
-
-        function closeModal() {
-            const modal = document.getElementById('deleteModal');
-            modal.classList.remove('show');
+            });
             
-            if (swipeNoteId) {
-                const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
+            // Desktop delete button
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                deletePasswordSafe(index);
+            });
+
+            // Touch/Mouse interaction variables
+            let startX = 0;
+            let startY = 0;
+            let currentX = 0;
+            let isDragging = false;
+            let isTouch = false;
+            let holdTimer = null;
+            let isHolding = false;
+            let isPasswordRevealed = false;
+            let hasMoved = false;
+            let isVerticalScroll = false;
+
+            // Mouse events
+            element.addEventListener('mousedown', handleStart);
+            element.addEventListener('mousemove', handleMove);
+            element.addEventListener('mouseup', handleEnd);
+            element.addEventListener('mouseleave', handleEnd);
+
+            // Touch events
+            element.addEventListener('touchstart', handleStart, { passive: true });
+            element.addEventListener('touchmove', handleMove, { passive: false });
+            element.addEventListener('touchend', handleEnd);
+            element.addEventListener('touchcancel', handleEnd);
+
+            function handleStart(e) {
+                const point = e.touches ? e.touches[0] : e;
+                startX = point.clientX;
+                startY = point.clientY;
+                currentX = 0;
+                isDragging = false;
+                isTouch = e.type === 'touchstart';
+                isHolding = true;
+                hasMoved = false;
+                isVerticalScroll = false;
                 
-                if (noteContainer) {
-                    const noteItem = noteContainer.querySelector('.note-item');
+                element.classList.add('swiping');
+                
+                // Start hold timer for password reveal (1 second)
+                holdTimer = setTimeout(() => {
+                    if (isHolding && !hasMoved && !isDragging && !isVerticalScroll) {
+                        passwordDisplay.classList.remove('hidden');
+                        isPasswordRevealed = true;
+                        // Add slight vibration on mobile if supported
+                        if (navigator.vibrate && isTouch) {
+                            navigator.vibrate(50);
+                        }
+                    }
+                }, 1000);
+            }
+
+            function handleMove(e) {
+                if (!startX) return;
+                
+                const point = e.touches ? e.touches[0] : e;
+                const deltaX = point.clientX - startX;
+                const deltaY = point.clientY - startY;
+                
+                // Determine direction of movement early
+                if (Math.abs(deltaX) > 5 || Math.abs(deltaY) > 5) {
+                    hasMoved = true;
                     
-                    if (noteItem) {
-                        noteItem.style.transition = 'transform 0.3s ease-out';
-                        noteItem.style.transform = 'translateX(0px)';
+                    // Determine if this is primarily vertical scrolling
+                    if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 10) {
+                        isVerticalScroll = true;
+                        // Allow normal scrolling - don't prevent default
+                        if (holdTimer) {
+                            clearTimeout(holdTimer);
+                            holdTimer = null;
+                        }
+                        if (isPasswordRevealed) {
+                            passwordDisplay.classList.add('hidden');
+                            isPasswordRevealed = false;
+                        }
+                        return; // Exit early to allow normal scroll
+                    }
+                    
+                    // Horizontal swipe detection (for delete on mobile)
+                    if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 20) {
+                        isDragging = true;
                         
-                        setTimeout(() => {
-                            if (noteItem) {
-                                noteItem.style.transition = '';
+                        // Only handle horizontal swipe on mobile/touch devices
+                        if (isTouch && window.innerWidth <= 768) {
+                            e.preventDefault(); // Only prevent default for horizontal swipes
+                            
+                            currentX = Math.min(0, deltaX); // Only allow left swipe
+                            element.style.transform = `translateX(${currentX}px)`;
+                            
+                            // Show delete indicator when swiped far enough
+                            if (currentX < -60) {
+                                element.classList.add('delete-ready');
+                            } else {
+                                element.classList.remove('delete-ready');
                             }
-                        }, 350);
+                        }
+                    }
+                    
+                    // Cancel hold timer for any significant movement
+                    if (holdTimer) {
+                        clearTimeout(holdTimer);
+                        holdTimer = null;
+                    }
+                    if (isPasswordRevealed) {
+                        passwordDisplay.classList.add('hidden');
+                        isPasswordRevealed = false;
                     }
                 }
             }
-            
-            swipeNoteId = null;
-        }
 
-        // Event listeners
-        window.onclick = function(event) {
-            if (event.target.classList.contains('modal')) {
-                closeModal();
-            }
-        }
-
-        window.addEventListener('popstate', function(e) {
-            const editorActive = document.getElementById('editorContainer').classList.contains('active');
-            
-            if (editorActive) {
-                // If editor is open and user pressed back, close it
-                closeEditor();
-            } else if (e.state && e.state.view === 'editor' && e.state.noteId) {
-                // If we're going forward to a note, open it
-                const note = notes.find(n => n.id === e.state.noteId);
-                if (note) {
-                    currentNote = note;
-                    // Don't push another state since we're responding to popstate
-                    document.getElementById('sidebar').classList.add('hidden');
-                    document.getElementById('editorContainer').classList.add('active');
-                    document.getElementById('fab').classList.add('hidden');
-                    
-                    document.getElementById('noteTitle').value = currentNote.title;
-                    const noteContent = document.getElementById('noteContent');
-                    noteContent.innerHTML = '';
-                    
-                    const formattedContent = convertTextToFormattedHTML(currentNote.content);
-                    noteContent.innerHTML = formattedContent;
-                    
-                    document.getElementById('pinBtn').classList.toggle('active', currentNote.isPinned);
-                    
-                    updateCharCount();
-                    updateLastSaved();
-                    // Removed auto-focus here too
+            function handleEnd(e) {
+                if (!startX) return;
+                
+                isHolding = false;
+                element.classList.remove('swiping');
+                
+                // Clear hold timer
+                if (holdTimer) {
+                    clearTimeout(holdTimer);
+                    holdTimer = null;
                 }
+                
+                // Hide password when releasing
+                if (isPasswordRevealed) {
+                    setTimeout(() => {
+                        passwordDisplay.classList.add('hidden');
+                        isPasswordRevealed = false;
+                    }, 100);
+                }
+                
+                // Handle swipe-to-delete on mobile
+                if (isTouch && window.innerWidth <= 768 && currentX < -100) {
+                    deletePasswordSafe(index);
+                    return;
+                }
+                
+                // Reset position
+                element.style.transform = 'translateX(0)';
+                element.classList.remove('delete-ready');
+                
+                // Handle click-to-copy (only if it was a quick tap without movement or scrolling)
+                if (!hasMoved && !isDragging && !isVerticalScroll && !isPasswordRevealed) {
+                    copyToClipboard(password, 'password');
+                }
+                
+                // Reset values
+                startX = 0;
+                currentX = 0;
+                isDragging = false;
+                isTouch = false;
+                hasMoved = false;
+                isVerticalScroll = false;
             }
-        });
+        }
 
-        window.addEventListener('beforeunload', function() {
-            if (currentNote) {
-                currentNote.updatedAt = new Date().toISOString();
-                saveNotes();
+        async function deletePasswordSafe(index) {
+            try {
+                if (!passwords[index]) {
+                    alert('Password not found');
+                    return;
+                }
+                
+                const siteName = passwords[index].siteName;
+                if (!confirm(`Delete password for ${siteName}?`)) return;
+
+                // Remove from array immediately to update UI
+                const deletedPassword = passwords.splice(index, 1)[0];
+                
+                // Update display immediately
+                displayPasswords();
+                
+                // Update filtered passwords if search is active
+                if (filteredPasswords.length > 0) {
+                    const filteredIndex = filteredPasswords.indexOf(deletedPassword);
+                    if (filteredIndex > -1) {
+                        filteredPasswords.splice(filteredIndex, 1);
+                    }
+                }
+                
+                // Show feedback immediately
+                showCopyFeedback('🗑️ Password deleted');
+                
+                // Try to save to GitHub in background
+                try {
+                    await savePasswordsToGitHub();
+                } catch (saveError) {
+                    console.error('Failed to sync deletion to GitHub:', saveError);
+                    // Restore the password if GitHub save failed
+                    passwords.splice(index, 0, deletedPassword);
+                    displayPasswords();
+                    showCopyFeedback('❌ Delete failed - restored');
+                    throw saveError;
+                }
+                
+            } catch (error) {
+                console.error('Delete failed:', error);
+                alert('Failed to delete password. Please try again.');
             }
-        });
+        }
+
+        async function copyToClipboard(text, type) {
+            try {
+                await navigator.clipboard.writeText(text);
+                if (type === 'password') {
+                    showCopyFeedback('🔑 Password copied!');
+                } else {
+                    showCopyFeedback('👤 Username copied!');
+                }
+            } catch (error) {
+                // Fallback for browsers that don't support clipboard API
+                const textArea = document.createElement('textarea');
+                textArea.value = text;
+                document.body.appendChild(textArea);
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                    showCopyFeedback(type === 'password' ? '🔑 Password copied!' : '👤 Username copied!');
+                } catch (fallbackError) {
+                    alert('Failed to copy to clipboard');
+                }
+                document.body.removeChild(textArea);
+            }
+        }
+
+        function showCopyFeedback(message) {
+            const feedback = document.getElementById('copyFeedback');
+            feedback.textContent = message;
+            feedback.classList.add('show');
+            
+            setTimeout(() => {
+                feedback.classList.remove('show');
+            }, 2000);
+        }
+
+        // Auto-sync every 5 minutes
+        setInterval(() => {
+            if (masterKey && document.visibilityState === 'visible') {
+                syncNow();
+            }
+        }, 5 * 60 * 1000);
+
+        // Auto-lock after 15 minutes of inactivity
+        let inactivityTimer;
+        function resetInactivityTimer() {
+            clearTimeout(inactivityTimer);
+            if (masterKey) {
+                inactivityTimer = setTimeout(() => {
+                    logout();
+                    alert('🔒 Session expired due to inactivity.');
+                }, 15 * 60 * 1000);
+            }
+        }
+
+        document.addEventListener('click', resetInactivityTimer);
+        document.addEventListener('keypress', resetInactivityTimer);
+        document.addEventListener('touchstart', resetInactivityTimer);
     </script>
 </body>
 </html>
