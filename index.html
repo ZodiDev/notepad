@@ -871,7 +871,7 @@ _***all three***_"></div>
             if (!currentNote || isProcessingInput) return;
             
             // Update the note content immediately with plain text
-            currentNote.content = getPlainTextContent();
+            currentNote.content = getPlainText();
             updateCharCount();
             autoSave();
         }
@@ -914,65 +914,9 @@ _***all three***_"></div>
             }, 300);
         }
 
-        function getPlainTextContent() {
+        function getPlainText() {
             const noteContent = document.getElementById('noteContent');
-            let text = '';
-            
-            // Walk through all nodes to preserve formatting markers in plain text
-            function extractText(node) {
-                if (node.nodeType === Node.TEXT_NODE) {
-                    return node.textContent;
-                } else if (node.nodeType === Node.ELEMENT_NODE) {
-                    if (node.tagName === 'BR') {
-                        return '\n';
-                    } else if (node.classList && node.classList.contains('centered-line')) {
-                        // Extract original format from centered line
-                        const textContent = node.textContent;
-                        const match = textContent.match(/^-+\s+(.+)\s+-+$/);
-                        if (match) {
-                            return `-${match[1]}-`;
-                        }
-                        return textContent;
-                    } else if (node.classList) {
-                        // Reconstruct formatting markers based on classes
-                        let content = '';
-                        for (let child of node.childNodes) {
-                            content += extractText(child);
-                        }
-                        
-                        if (node.classList.contains('bold-italic-underline')) {
-                            return `_***${content}***_`;
-                        } else if (node.classList.contains('italic-underline')) {
-                            return `_**${content}**_`;
-                        } else if (node.classList.contains('bold-underline')) {
-                            return `_*${content}*_`;
-                        } else if (node.classList.contains('bold-italic')) {
-                            return `***${content}***`;
-                        } else if (node.classList.contains('italic')) {
-                            return `**${content}**`;
-                        } else if (node.classList.contains('bold')) {
-                            return `*${content}*`;
-                        } else if (node.classList.contains('underline')) {
-                            return `_${content}_`;
-                        }
-                        
-                        return content;
-                    } else {
-                        let content = '';
-                        for (let child of node.childNodes) {
-                            content += extractText(child);
-                        }
-                        return content;
-                    }
-                }
-                return '';
-            }
-            
-            for (let child of noteContent.childNodes) {
-                text += extractText(child);
-            }
-            
-            return text;
+            return noteContent.innerText || noteContent.textContent || '';
         }
 
         function processFormatting() {
@@ -983,16 +927,18 @@ _***all three***_"></div>
             const selection = window.getSelection();
             const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
             
-            // Get current cursor position in plain text
+            // Get current cursor position
             let cursorPosition = 0;
             if (range) {
-                const plainText = getPlainTextContent();
-                const preCaretContent = getContentBeforeCursor(noteContent, range);
-                cursorPosition = preCaretContent.length;
+                const preCaretRange = range.cloneRange();
+                preCaretRange.selectNodeContents(noteContent);
+                preCaretRange.setEnd(range.endContainer, range.endOffset);
+                cursorPosition = preCaretRange.toString().length;
             }
             
-            // Get plain text content
-            const plainText = getPlainTextContent();
+            // Get plain text content and store it
+            const plainText = getPlainText();
+            currentNote.content = plainText;
             
             // Only process if there are formatting characters to avoid unnecessary updates
             if (!/[*_-]/.test(plainText)) {
@@ -1008,31 +954,10 @@ _***all three***_"></div>
                 noteContent.innerHTML = formattedHTML;
                 
                 // Restore cursor position
-                restoreCursorPosition(noteContent, cursorPosition, plainText);
+                restoreCursorPosition(noteContent, cursorPosition);
             }
             
-            // Update the note content
-            currentNote.content = plainText;
-            
             isProcessingInput = false;
-        }
-
-        function getContentBeforeCursor(container, range) {
-            const preCaretRange = range.cloneRange();
-            preCaretRange.selectNodeContents(container);
-            preCaretRange.setEnd(range.endContainer, range.endOffset);
-            
-            // Create a temporary container to extract plain text
-            const tempDiv = document.createElement('div');
-            tempDiv.appendChild(preCaretRange.cloneContents());
-            
-            return getPlainTextFromHTML(tempDiv.innerHTML);
-        }
-
-        function getPlainTextFromHTML(html) {
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = html;
-            return getPlainTextContent.call({ getElementById: () => tempDiv });
         }
 
         function convertTextToFormattedHTML(text) {
@@ -1042,8 +967,8 @@ _***all three***_"></div>
             // Handle line breaks
             html = html.replace(/\n/g, '<br>');
             
-            // Process centering first (most specific pattern)
-            html = html.replace(/-([^-\n\r]+)-/g, (match, content) => {
+            // Process centering FIRST (most specific pattern) to avoid conflicts
+            html = html.replace(/-([^-\n\r]+)-(?!\s*-)/g, (match, content) => {
                 const trimmedContent = content.trim();
                 if (trimmedContent.length === 0) return match;
                 
@@ -1052,37 +977,43 @@ _***all three***_"></div>
                 const leftDashes = Math.floor(totalDashes / 2);
                 const rightDashes = totalDashes - leftDashes;
                 
+                if (totalDashes < 1) {
+                    // Content too long, just use minimal dashes
+                    return `<div class="centered-line">- ${trimmedContent} -</div>`;
+                }
+                
                 const centeredLine = '-'.repeat(leftDashes) + ' ' + trimmedContent + ' ' + '-'.repeat(rightDashes);
                 return `<div class="centered-line">${centeredLine}</div>`;
             });
             
-            // Process other formatting patterns in order of specificity (most specific first)
+            // Process other formatting patterns in order of complexity (most specific first)
+            // This order prevents shorter patterns from interfering with longer ones
             
             // _***text***_ = bold + italic + underline  
-            html = html.replace(/_\*\*\*([^*_\n\r<>]+)\*\*\*_/g, '<span class="bold-italic-underline">$1</span>');
+            html = html.replace(/_\*{3}([^*_\n\r<>]+?)\*{3}_/g, '<span class="bold-italic-underline">$1</span>');
             
             // _**text**_ = italic + underline
-            html = html.replace(/_\*\*([^*_\n\r<>]+)\*\*_/g, '<span class="italic-underline">$1</span>');
+            html = html.replace(/_\*{2}([^*_\n\r<>]+?)\*{2}_/g, '<span class="italic-underline">$1</span>');
             
             // _*text*_ = bold + underline  
-            html = html.replace(/_\*([^*_\n\r<>]+)\*_/g, '<span class="bold-underline">$1</span>');
+            html = html.replace(/_\*([^*_\n\r<>]+?)\*_/g, '<span class="bold-underline">$1</span>');
             
             // ***text*** = bold + italic
-            html = html.replace(/\*\*\*([^*_\n\r<>]+)\*\*\*/g, '<span class="bold-italic">$1</span>');
+            html = html.replace(/\*{3}([^*_\n\r<>]+?)\*{3}/g, '<span class="bold-italic">$1</span>');
             
             // **text** = italic  
-            html = html.replace(/\*\*([^*_\n\r<>]+)\*\*/g, '<span class="italic">$1</span>');
+            html = html.replace(/\*{2}([^*_\n\r<>]+?)\*{2}/g, '<span class="italic">$1</span>');
             
             // *text* = bold
-            html = html.replace(/\*([^*_\n\r<>]+)\*/g, '<span class="bold">$1</span>');
+            html = html.replace(/\*([^*_\n\r<>]+?)\*/g, '<span class="bold">$1</span>');
             
-            // _text_ = underline
-            html = html.replace(/_([^*_\n\r<>]+)_/g, '<span class="underline">$1</span>');
+            // _text_ = underline (only if not part of a larger pattern)
+            html = html.replace(/_([^*_\n\r<>]+?)_/g, '<span class="underline">$1</span>');
             
             return html;
         }
 
-        function restoreCursorPosition(element, position, originalText) {
+        function restoreCursorPosition(element, position) {
             const walker = document.createTreeWalker(
                 element,
                 NodeFilter.SHOW_TEXT,
@@ -1099,26 +1030,23 @@ _***all three***_"></div>
                     const range = document.createRange();
                     const selection = window.getSelection();
                     
-                    const offset = Math.min(position - currentPosition, nodeLength);
-                    range.setStart(node, offset);
+                    range.setStart(node, position - currentPosition);
                     range.collapse(true);
                     
                     selection.removeAllRanges();
                     selection.addRange(range);
-                    break;
+                    return;
                 }
                 currentPosition += nodeLength;
             }
             
-            // If we couldn't find the exact position, place cursor at end
-            if (currentPosition < position) {
-                const range = document.createRange();
-                const selection = window.getSelection();
-                range.selectNodeContents(element);
-                range.collapse(false);
-                selection.removeAllRanges();
-                selection.addRange(range);
-            }
+            // If we couldn't place cursor exactly, place at end
+            const range = document.createRange();
+            const selection = window.getSelection();
+            range.selectNodeContents(element);
+            range.collapse(false);
+            selection.removeAllRanges();
+            selection.addRange(range);
         }
 
         function autoSave() {
@@ -1429,7 +1357,7 @@ _***all three***_"></div>
         }
 
         function updateCharCount() {
-            const content = getPlainTextContent() || '';
+            const content = getPlainText();
             document.getElementById('charCount').textContent = `${content.length} characters`;
         }
 
