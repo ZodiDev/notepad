@@ -398,7 +398,7 @@
 
         .editor-textarea .centered-line {
             text-align: center;
-            color: var(--text-secondary);
+            color: var(--text-primary);
             font-family: monospace;
             letter-spacing: 1px;
         }
@@ -968,11 +968,13 @@ _***all three***_"></div>
             html = html.replace(/\n/g, '<br>');
             
             // Process centering FIRST (most specific pattern) to avoid conflicts
-            html = html.replace(/-([^-\n\r]+)-(?!\s*-)/g, (match, content) => {
+            // Only match standalone words/phrases surrounded by dashes, not dashes within words
+            html = html.replace(/(?:^|\s)-([^-\n\r\s][^-\n\r]*?[^-\n\r\s]|[^-\n\r\s])-(?=\s|$)/g, (match, content) => {
                 const trimmedContent = content.trim();
                 if (trimmedContent.length === 0) return match;
                 
-                const lineWidth = 40;
+                // Use smaller line width for mobile
+                const lineWidth = 30;
                 const totalDashes = lineWidth - trimmedContent.length - 2; // -2 for spaces around content
                 const leftDashes = Math.floor(totalDashes / 2);
                 const rightDashes = totalDashes - leftDashes;
