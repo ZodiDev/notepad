@@ -396,6 +396,13 @@
             text-decoration: underline;
         }
 
+        .editor-textarea .centered-line {
+            text-align: center;
+            color: var(--text-secondary);
+            font-family: monospace;
+            letter-spacing: 1px;
+        }
+
         .editor-footer {
             padding: 12px 20px;
             border-top: 1px solid var(--border);
@@ -567,14 +574,13 @@
             opacity: 1;
         }
     
-.note-swipe-container { min-height: auto; }
-.notes-list { overflow-y: auto; }
+        .note-swipe-container { min-height: auto; }
+        .notes-list { overflow-y: auto; }
 
+        /* Force exactly two columns at all widths */
+        .notes-list { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 
-/* Force exactly two columns at all widths */
-.notes-list { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
-
-</style>
+    </style>
 </head>
 <body>
     <!-- Save Status Indicator -->
@@ -616,6 +622,7 @@ Formatting happens when you press space or pause:
 **italic text** → italic text  
 ***bold italic*** → bold italic
 _underlined text_ → underlined text
+-centered text- → --------- centered text ---------
 
 Combine them:
 _*bold + underlined*_
@@ -705,11 +712,19 @@ _***all three***_"></div>
                     openEditor();
                 } else {
                     // Invalid note ID, go back to list
-                    history.replaceState({ view: 'list' }, '', window.location.pathname);
+                    try {
+                        history.replaceState({ view: 'list' }, '', window.location.pathname);
+                    } catch (e) {
+                        window.location.hash = '';
+                    }
                 }
             } else {
                 // Make sure we start with list state in history
-                history.replaceState({ view: 'list' }, '', window.location.pathname);
+                try {
+                    history.replaceState({ view: 'list' }, '', window.location.pathname);
+                } catch (e) {
+                    // Fallback for sandboxed environments - no action needed
+                }
             }
             
             // Event listeners
@@ -733,7 +748,7 @@ _***all three***_"></div>
                 {
                     id: generateId(),
                     title: 'Welcome to Notes!',
-                    content: 'This is your new notes app with automatic formatting!\n\nTry typing:\n*bold text* and press space\n**italic text** and press space\n***bold italic*** and press space\n_underlined text_ and press space\n\nCombine them:\n_*bold underlined*_\n_**italic underlined**_\n_***bold italic underlined***_',
+                    content: 'This is your new notes app with automatic formatting!\n\nTry typing:\n*bold text* and press space\n**italic text** and press space\n***bold italic*** and press space\n_underlined text_ and press space\n-centered text- and press space\n\nCombine them:\n_*bold underlined*_\n_**italic underlined**_\n_***bold italic underlined***_',
                     createdAt: new Date().toISOString(),
                     updatedAt: new Date().toISOString(),
                     isPinned: false
@@ -799,8 +814,13 @@ _***all three***_"></div>
         function openEditor() {
             if (!currentNote) return;
             
-            // Push a state to browser history so back button works
-            history.pushState({ view: 'editor', noteId: currentNote.id }, '', `#note-${currentNote.id}`);
+            // Push a state to browser history so back button works (with error handling for sandboxed environments)
+            try {
+                history.pushState({ view: 'editor', noteId: currentNote.id }, '', `#note-${currentNote.id}`);
+            } catch (e) {
+                // Fallback for sandboxed environments - just update hash
+                window.location.hash = `#note-${currentNote.id}`;
+            }
             
             document.getElementById('sidebar').classList.add('hidden');
             document.getElementById('editorContainer').classList.add('active');
@@ -830,7 +850,12 @@ _***all three***_"></div>
             
             // Update URL to show we're back at notes list
             if (window.location.hash) {
-                history.replaceState({ view: 'list' }, '', window.location.pathname);
+                try {
+                    history.replaceState({ view: 'list' }, '', window.location.pathname);
+                } catch (e) {
+                    // Fallback for sandboxed environments
+                    window.location.hash = '';
+                }
             }
         }
 
@@ -846,7 +871,7 @@ _***all three***_"></div>
             if (!currentNote || isProcessingInput) return;
             
             // Update the note content immediately with plain text
-            currentNote.content = getPlainText();
+            currentNote.content = getPlainTextContent();
             updateCharCount();
             autoSave();
         }
@@ -889,9 +914,65 @@ _***all three***_"></div>
             }, 300);
         }
 
-        function getPlainText() {
+        function getPlainTextContent() {
             const noteContent = document.getElementById('noteContent');
-            return noteContent.innerText || noteContent.textContent || '';
+            let text = '';
+            
+            // Walk through all nodes to preserve formatting markers in plain text
+            function extractText(node) {
+                if (node.nodeType === Node.TEXT_NODE) {
+                    return node.textContent;
+                } else if (node.nodeType === Node.ELEMENT_NODE) {
+                    if (node.tagName === 'BR') {
+                        return '\n';
+                    } else if (node.classList && node.classList.contains('centered-line')) {
+                        // Extract original format from centered line
+                        const textContent = node.textContent;
+                        const match = textContent.match(/^-+\s+(.+)\s+-+$/);
+                        if (match) {
+                            return `-${match[1]}-`;
+                        }
+                        return textContent;
+                    } else if (node.classList) {
+                        // Reconstruct formatting markers based on classes
+                        let content = '';
+                        for (let child of node.childNodes) {
+                            content += extractText(child);
+                        }
+                        
+                        if (node.classList.contains('bold-italic-underline')) {
+                            return `_***${content}***_`;
+                        } else if (node.classList.contains('italic-underline')) {
+                            return `_**${content}**_`;
+                        } else if (node.classList.contains('bold-underline')) {
+                            return `_*${content}*_`;
+                        } else if (node.classList.contains('bold-italic')) {
+                            return `***${content}***`;
+                        } else if (node.classList.contains('italic')) {
+                            return `**${content}**`;
+                        } else if (node.classList.contains('bold')) {
+                            return `*${content}*`;
+                        } else if (node.classList.contains('underline')) {
+                            return `_${content}_`;
+                        }
+                        
+                        return content;
+                    } else {
+                        let content = '';
+                        for (let child of node.childNodes) {
+                            content += extractText(child);
+                        }
+                        return content;
+                    }
+                }
+                return '';
+            }
+            
+            for (let child of noteContent.childNodes) {
+                text += extractText(child);
+            }
+            
+            return text;
         }
 
         function processFormatting() {
@@ -902,20 +983,19 @@ _***all three***_"></div>
             const selection = window.getSelection();
             const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
             
-            // Get current cursor position
+            // Get current cursor position in plain text
             let cursorPosition = 0;
             if (range) {
-                const preCaretRange = range.cloneRange();
-                preCaretRange.selectNodeContents(noteContent);
-                preCaretRange.setEnd(range.endContainer, range.endOffset);
-                cursorPosition = preCaretRange.toString().length;
+                const plainText = getPlainTextContent();
+                const preCaretContent = getContentBeforeCursor(noteContent, range);
+                cursorPosition = preCaretContent.length;
             }
             
             // Get plain text content
-            const plainText = getPlainText();
+            const plainText = getPlainTextContent();
             
             // Only process if there are formatting characters to avoid unnecessary updates
-            if (!/[*_]/.test(plainText)) {
+            if (!/[*_-]/.test(plainText)) {
                 isProcessingInput = false;
                 return;
             }
@@ -928,13 +1008,31 @@ _***all three***_"></div>
                 noteContent.innerHTML = formattedHTML;
                 
                 // Restore cursor position
-                restoreCursorPosition(noteContent, cursorPosition);
+                restoreCursorPosition(noteContent, cursorPosition, plainText);
             }
             
             // Update the note content
             currentNote.content = plainText;
             
             isProcessingInput = false;
+        }
+
+        function getContentBeforeCursor(container, range) {
+            const preCaretRange = range.cloneRange();
+            preCaretRange.selectNodeContents(container);
+            preCaretRange.setEnd(range.endContainer, range.endOffset);
+            
+            // Create a temporary container to extract plain text
+            const tempDiv = document.createElement('div');
+            tempDiv.appendChild(preCaretRange.cloneContents());
+            
+            return getPlainTextFromHTML(tempDiv.innerHTML);
+        }
+
+        function getPlainTextFromHTML(html) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = html;
+            return getPlainTextContent.call({ getElementById: () => tempDiv });
         }
 
         function convertTextToFormattedHTML(text) {
@@ -944,34 +1042,47 @@ _***all three***_"></div>
             // Handle line breaks
             html = html.replace(/\n/g, '<br>');
             
-            // Process formatting patterns in order of specificity (most specific first)
-            // We need to handle the most complex patterns first to avoid conflicts
+            // Process centering first (most specific pattern)
+            html = html.replace(/-([^-\n\r]+)-/g, (match, content) => {
+                const trimmedContent = content.trim();
+                if (trimmedContent.length === 0) return match;
+                
+                const lineWidth = 40;
+                const totalDashes = lineWidth - trimmedContent.length - 2; // -2 for spaces around content
+                const leftDashes = Math.floor(totalDashes / 2);
+                const rightDashes = totalDashes - leftDashes;
+                
+                const centeredLine = '-'.repeat(leftDashes) + ' ' + trimmedContent + ' ' + '-'.repeat(rightDashes);
+                return `<div class="centered-line">${centeredLine}</div>`;
+            });
+            
+            // Process other formatting patterns in order of specificity (most specific first)
             
             // _***text***_ = bold + italic + underline  
-            html = html.replace(/_\*\*\*([^*_]+)\*\*\*_/g, '<span class="bold-italic-underline">$1</span>');
+            html = html.replace(/_\*\*\*([^*_\n\r<>]+)\*\*\*_/g, '<span class="bold-italic-underline">$1</span>');
             
             // _**text**_ = italic + underline
-            html = html.replace(/_\*\*([^*_]+)\*\*_/g, '<span class="italic-underline">$1</span>');
+            html = html.replace(/_\*\*([^*_\n\r<>]+)\*\*_/g, '<span class="italic-underline">$1</span>');
             
             // _*text*_ = bold + underline  
-            html = html.replace(/_\*([^*_]+)\*_/g, '<span class="bold-underline">$1</span>');
+            html = html.replace(/_\*([^*_\n\r<>]+)\*_/g, '<span class="bold-underline">$1</span>');
             
             // ***text*** = bold + italic
-            html = html.replace(/\*\*\*([^*_]+)\*\*\*/g, '<span class="bold-italic">$1</span>');
+            html = html.replace(/\*\*\*([^*_\n\r<>]+)\*\*\*/g, '<span class="bold-italic">$1</span>');
             
             // **text** = italic  
-            html = html.replace(/\*\*([^*_]+)\*\*/g, '<span class="italic">$1</span>');
+            html = html.replace(/\*\*([^*_\n\r<>]+)\*\*/g, '<span class="italic">$1</span>');
             
             // *text* = bold
-            html = html.replace(/\*([^*_]+)\*/g, '<span class="bold">$1</span>');
+            html = html.replace(/\*([^*_\n\r<>]+)\*/g, '<span class="bold">$1</span>');
             
             // _text_ = underline
-            html = html.replace(/_([^*_]+)_/g, '<span class="underline">$1</span>');
+            html = html.replace(/_([^*_\n\r<>]+)_/g, '<span class="underline">$1</span>');
             
             return html;
         }
 
-        function restoreCursorPosition(element, position) {
+        function restoreCursorPosition(element, position, originalText) {
             const walker = document.createTreeWalker(
                 element,
                 NodeFilter.SHOW_TEXT,
@@ -988,7 +1099,8 @@ _***all three***_"></div>
                     const range = document.createRange();
                     const selection = window.getSelection();
                     
-                    range.setStart(node, position - currentPosition);
+                    const offset = Math.min(position - currentPosition, nodeLength);
+                    range.setStart(node, offset);
                     range.collapse(true);
                     
                     selection.removeAllRanges();
@@ -996,6 +1108,16 @@ _***all three***_"></div>
                     break;
                 }
                 currentPosition += nodeLength;
+            }
+            
+            // If we couldn't find the exact position, place cursor at end
+            if (currentPosition < position) {
+                const range = document.createRange();
+                const selection = window.getSelection();
+                range.selectNodeContents(element);
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
             }
         }
 
@@ -1041,7 +1163,11 @@ _***all three***_"></div>
                 currentNote = null;
                 closeEditor();
                 // Replace the current history state to prevent going back to deleted note
-                history.replaceState({ view: 'list' }, '', window.location.pathname);
+                try {
+                    history.replaceState({ view: 'list' }, '', window.location.pathname);
+                } catch (e) {
+                    window.location.hash = '';
+                }
             }
             
             // Close modal and reset
@@ -1256,7 +1382,7 @@ _***all three***_"></div>
                 noteContainer.dataset.noteId = note.id;
                 
                 // Strip formatting for preview
-                const preview = note.content.replace(/[*_]/g, '').substring(0, 100);
+                const preview = note.content.replace(/[*_-]/g, '').substring(0, 100);
                 
                 noteContainer.innerHTML = `
                     <div class="note-swipe-background">
@@ -1303,7 +1429,7 @@ _***all three***_"></div>
         }
 
         function updateCharCount() {
-            const content = document.getElementById('noteContent').innerText || '';
+            const content = getPlainTextContent() || '';
             document.getElementById('charCount').textContent = `${content.length} characters`;
         }
 
