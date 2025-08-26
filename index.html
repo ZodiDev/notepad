@@ -851,27 +851,13 @@ _***all three***_"></div>
         }
 
         function handleKeyDown(e) {
-            // Handle Enter key - insert single line break
+            // Handle Enter key - let it work naturally then trigger updates
             if (e.key === 'Enter') {
-                e.preventDefault();
-                
-                // Insert a single line break at cursor position
-                const selection = window.getSelection();
-                const range = selection.getRangeAt(0);
-                
-                // Create a line break element
-                const br = document.createElement('br');
-                range.deleteContents();
-                range.insertNode(br);
-                
-                // Move cursor after the line break
-                range.setStartAfter(br);
-                range.setEndAfter(br);
-                selection.removeAllRanges();
-                selection.addRange(range);
-                
-                // Trigger content change
-                handleContentChange();
+                // Don't prevent default - let the browser handle it naturally
+                setTimeout(() => {
+                    handleContentChange();
+                    scheduleFormatting();
+                }, 0);
                 return;
             }
             
