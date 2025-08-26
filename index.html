@@ -570,7 +570,6 @@
 .note-swipe-container { min-height: auto; }
 .notes-list { overflow-y: auto; }
 
-
 /* Force exactly two columns at all widths */
 .notes-list { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
 
@@ -688,8 +687,12 @@ _***all three***_"></div>
         let currentY = 0;
         let swipeThreshold = 60;
         let maxSwipeDistance = 120;
-        let minSwipeDistance = 15; // Minimum distance before we consider it a swipe
+        let minSwipeDistance = 15;
         let swipeDirectionLocked = false;
+
+        // Formatting state
+        let formatTimer = null;
+        let lastProcessedContent = '';
 
         // Initialize
         document.addEventListener('DOMContentLoaded', function() {
@@ -704,11 +707,9 @@ _***all three***_"></div>
                     currentNote = note;
                     openEditor();
                 } else {
-                    // Invalid note ID, go back to list
                     history.replaceState({ view: 'list' }, '', window.location.pathname);
                 }
             } else {
-                // Make sure we start with list state in history
                 history.replaceState({ view: 'list' }, '', window.location.pathname);
             }
             
@@ -721,7 +722,7 @@ _***all three***_"></div>
             noteContent.addEventListener('keydown', handleKeyDown);
             noteContent.addEventListener('paste', handlePaste);
             
-            // Create some demo notes if none exist
+            // Create demo notes if none exist
             if (notes.length === 0) {
                 createDemoNotes();
                 showSwipeHint();
@@ -787,7 +788,7 @@ _***all three***_"></div>
             currentNote = newNote;
             saveNotes();
             renderNotesList();
-            openEditor(); // This will handle the history push
+            openEditor();
         }
 
         function selectNote(noteId) {
@@ -799,7 +800,6 @@ _***all three***_"></div>
         function openEditor() {
             if (!currentNote) return;
             
-            // Push a state to browser history so back button works
             history.pushState({ view: 'editor', noteId: currentNote.id }, '', `#note-${currentNote.id}`);
             
             document.getElementById('sidebar').classList.add('hidden');
@@ -813,13 +813,12 @@ _***all three***_"></div>
             // Convert plain text to formatted HTML
             const formattedContent = convertTextToFormattedHTML(currentNote.content);
             noteContent.innerHTML = formattedContent;
+            lastProcessedContent = formattedContent;
             
             document.getElementById('pinBtn').classList.toggle('active', currentNote.isPinned);
             
             updateCharCount();
             updateLastSaved();
-            
-            // Removed auto-focus - user taps where they want to type
         }
 
         function closeEditor() {
@@ -828,7 +827,6 @@ _***all three***_"></div>
             document.getElementById('fab').classList.remove('hidden');
             renderNotesList();
             
-            // Update URL to show we're back at notes list
             if (window.location.hash) {
                 history.replaceState({ view: 'list' }, '', window.location.pathname);
             }
@@ -840,53 +838,77 @@ _***all three***_"></div>
             autoSave();
         }
 
-        let formatTimer = null;
-
         function handleContentChange(e) {
             if (!currentNote || isProcessingInput) return;
             
-            // Update the note content immediately with plain text
+            // Update the note content with plain text
             currentNote.content = getPlainText();
             updateCharCount();
             autoSave();
+            
+            // Schedule formatting processing
+            scheduleFormatting();
         }
 
         function handleKeyDown(e) {
-            // Handle Enter key for line breaks
+            // Handle Enter key - insert single line break
             if (e.key === 'Enter') {
                 e.preventDefault();
-                document.execCommand('insertHTML', false, '<br><br>');
-                triggerDelayedFormatting();
-                return;
-            }
-            
-            // Handle Space - trigger formatting after space
-            if (e.key === ' ') {
-                setTimeout(() => triggerDelayedFormatting(), 50);
+                
+                // Insert a single line break at cursor position
+                const selection = window.getSelection();
+                const range = selection.getRangeAt(0);
+                
+                // Create a line break element
+                const br = document.createElement('br');
+                range.deleteContents();
+                range.insertNode(br);
+                
+                // Move cursor after the line break
+                range.setStartAfter(br);
+                range.setEndAfter(br);
+                selection.removeAllRanges();
+                selection.addRange(range);
+                
+                // Trigger content change
+                handleContentChange();
                 return;
             }
             
             // Clear any pending formatting
             clearTimeout(formatTimer);
             
-            // Set a delayed formatting trigger
-            formatTimer = setTimeout(() => {
-                processFormatting();
-            }, 1500); // Only format after 1.5 seconds of no typing
+            // For other keys, schedule formatting
+            if (e.key === ' ' || e.key === 'Tab') {
+                setTimeout(() => scheduleFormatting(), 100);
+            }
         }
 
         function handlePaste(e) {
             e.preventDefault();
             const text = (e.originalEvent || e).clipboardData.getData('text/plain');
-            document.execCommand('insertText', false, text);
-            triggerDelayedFormatting();
+            
+            // Insert plain text at cursor position
+            const selection = window.getSelection();
+            const range = selection.getRangeAt(0);
+            range.deleteContents();
+            
+            const textNode = document.createTextNode(text);
+            range.insertNode(textNode);
+            range.setStartAfter(textNode);
+            range.setEndAfter(textNode);
+            selection.removeAllRanges();
+            selection.addRange(range);
+            
+            handleContentChange();
+            scheduleFormatting();
         }
 
-        function triggerDelayedFormatting() {
+        function scheduleFormatting() {
             clearTimeout(formatTimer);
             formatTimer = setTimeout(() => {
                 processFormatting();
-            }, 300);
+            }, 500); // Wait for 500ms of no typing before formatting
         }
 
         function getPlainText() {
@@ -896,45 +918,41 @@ _***all three***_"></div>
 
         function processFormatting() {
             if (isProcessingInput) return;
-            isProcessingInput = true;
             
             const noteContent = document.getElementById('noteContent');
-            const selection = window.getSelection();
-            const range = selection.rangeCount > 0 ? selection.getRangeAt(0) : null;
-            
-            // Get current cursor position
-            let cursorPosition = 0;
-            if (range) {
-                const preCaretRange = range.cloneRange();
-                preCaretRange.selectNodeContents(noteContent);
-                preCaretRange.setEnd(range.endContainer, range.endOffset);
-                cursorPosition = preCaretRange.toString().length;
-            }
-            
-            // Get plain text content
             const plainText = getPlainText();
             
-            // Only process if there are formatting characters to avoid unnecessary updates
+            // Only process if there are formatting characters
             if (!/[*_]/.test(plainText)) {
-                isProcessingInput = false;
                 return;
             }
             
-            // Convert to formatted HTML
             const formattedHTML = convertTextToFormattedHTML(plainText);
             
             // Only update if content actually changed
-            if (noteContent.innerHTML !== formattedHTML) {
+            if (formattedHTML !== lastProcessedContent) {
+                isProcessingInput = true;
+                
+                // Store current cursor position
+                const selection = window.getSelection();
+                let cursorPosition = 0;
+                if (selection.rangeCount > 0) {
+                    const range = selection.getRangeAt(0);
+                    const preCaretRange = range.cloneRange();
+                    preCaretRange.selectNodeContents(noteContent);
+                    preCaretRange.setEnd(range.endContainer, range.endOffset);
+                    cursorPosition = preCaretRange.toString().length;
+                }
+                
+                // Update content
                 noteContent.innerHTML = formattedHTML;
+                lastProcessedContent = formattedHTML;
                 
                 // Restore cursor position
                 restoreCursorPosition(noteContent, cursorPosition);
+                
+                isProcessingInput = false;
             }
-            
-            // Update the note content
-            currentNote.content = plainText;
-            
-            isProcessingInput = false;
         }
 
         function convertTextToFormattedHTML(text) {
@@ -944,58 +962,54 @@ _***all three***_"></div>
             // Handle line breaks
             html = html.replace(/\n/g, '<br>');
             
-            // Process formatting patterns in order of specificity (most specific first)
-            // We need to handle the most complex patterns first to avoid conflicts
-            
-            // _***text***_ = bold + italic + underline  
+            // Process formatting patterns in order of specificity
             html = html.replace(/_\*\*\*([^*_]+)\*\*\*_/g, '<span class="bold-italic-underline">$1</span>');
-            
-            // _**text**_ = italic + underline
             html = html.replace(/_\*\*([^*_]+)\*\*_/g, '<span class="italic-underline">$1</span>');
-            
-            // _*text*_ = bold + underline  
             html = html.replace(/_\*([^*_]+)\*_/g, '<span class="bold-underline">$1</span>');
-            
-            // ***text*** = bold + italic
             html = html.replace(/\*\*\*([^*_]+)\*\*\*/g, '<span class="bold-italic">$1</span>');
-            
-            // **text** = italic  
             html = html.replace(/\*\*([^*_]+)\*\*/g, '<span class="italic">$1</span>');
-            
-            // *text* = bold
             html = html.replace(/\*([^*_]+)\*/g, '<span class="bold">$1</span>');
-            
-            // _text_ = underline
             html = html.replace(/_([^*_]+)_/g, '<span class="underline">$1</span>');
             
             return html;
         }
 
         function restoreCursorPosition(element, position) {
-            const walker = document.createTreeWalker(
-                element,
-                NodeFilter.SHOW_TEXT,
-                null,
-                false
-            );
-            
-            let currentPosition = 0;
-            let node;
-            
-            while (node = walker.nextNode()) {
-                const nodeLength = node.textContent.length;
-                if (currentPosition + nodeLength >= position) {
-                    const range = document.createRange();
-                    const selection = window.getSelection();
-                    
-                    range.setStart(node, position - currentPosition);
-                    range.collapse(true);
-                    
-                    selection.removeAllRanges();
-                    selection.addRange(range);
-                    break;
+            try {
+                const walker = document.createTreeWalker(
+                    element,
+                    NodeFilter.SHOW_TEXT,
+                    null,
+                    false
+                );
+                
+                let currentPosition = 0;
+                let node;
+                
+                while (node = walker.nextNode()) {
+                    const nodeLength = node.textContent.length;
+                    if (currentPosition + nodeLength >= position) {
+                        const range = document.createRange();
+                        const selection = window.getSelection();
+                        
+                        const offset = Math.min(position - currentPosition, nodeLength);
+                        range.setStart(node, offset);
+                        range.collapse(true);
+                        
+                        selection.removeAllRanges();
+                        selection.addRange(range);
+                        break;
+                    }
+                    currentPosition += nodeLength;
                 }
-                currentPosition += nodeLength;
+            } catch (e) {
+                // If cursor restoration fails, just place it at the end
+                const range = document.createRange();
+                const selection = window.getSelection();
+                range.selectNodeContents(element);
+                range.collapse(false);
+                selection.removeAllRanges();
+                selection.addRange(range);
             }
         }
 
@@ -1014,7 +1028,7 @@ _***all three***_"></div>
                         showSaveStatus('error');
                     }
                 }
-            }, 1000);
+            }, 800);
         }
 
         function togglePin() {
@@ -1032,30 +1046,24 @@ _***all three***_"></div>
         function confirmDelete() {
             if (!swipeNoteId) return;
             
-            // Remove the note from array
             notes = notes.filter(note => note.id !== swipeNoteId);
             saveNotes();
             
-            // If deleting current note in editor, close editor and update history
             if (currentNote && currentNote.id === swipeNoteId) {
                 currentNote = null;
                 closeEditor();
-                // Replace the current history state to prevent going back to deleted note
                 history.replaceState({ view: 'list' }, '', window.location.pathname);
             }
             
-            // Close modal and reset
             const modal = document.getElementById('deleteModal');
             modal.classList.remove('show');
             swipeNoteId = null;
             
-            // Re-render the list
             renderNotesList();
         }
 
-        // Improved swipe handling functions
+        // Swipe handling functions (unchanged)
         function handleTouchStart(e, noteId) {
-            // Reset all swipe states
             touchStarted = true;
             isSwipeActive = false;
             swipeDirectionLocked = false;
@@ -1067,8 +1075,6 @@ _***all three***_"></div>
             currentY = startY;
             
             swipeNoteId = noteId;
-            
-            // Don't add swiping class or prevent anything yet - wait to see direction
         }
 
         function handleTouchMove(e) {
@@ -1082,13 +1088,10 @@ _***all three***_"></div>
             const deltaY = Math.abs(currentY - startY);
             const absDeltaX = Math.abs(deltaX);
             
-            // If we haven't determined direction yet and movement is significant enough
             if (!swipeDirectionLocked && (absDeltaX > minSwipeDistance || deltaY > minSwipeDistance)) {
                 swipeDirectionLocked = true;
                 
-                // Check if movement is more horizontal than vertical and moving left
                 if (absDeltaX > deltaY && deltaX > 0) {
-                    // This is a horizontal swipe left - activate swipe mode
                     isSwipeActive = true;
                     const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
                     const noteItem = noteContainer ? noteContainer.querySelector('.note-item') : null;
@@ -1096,18 +1099,15 @@ _***all three***_"></div>
                         noteItem.classList.add('swiping');
                     }
                 } else {
-                    // This is vertical scrolling or horizontal swipe right - don't interfere
                     touchStarted = false;
                     swipeNoteId = null;
                     return;
                 }
             }
             
-            // Only process swipe if we're in active swipe mode
             if (isSwipeActive) {
-                e.preventDefault(); // Only prevent default when we're sure it's a swipe
+                e.preventDefault();
                 
-                // Apply visual feedback for the swipe
                 if (deltaX > 0) {
                     const swipeDistance = Math.min(deltaX, maxSwipeDistance);
                     const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
@@ -1135,7 +1135,6 @@ _***all three***_"></div>
                 noteItem.classList.remove('swiping');
                 
                 if (deltaX > swipeThreshold) {
-                    // Swipe was far enough - trigger delete
                     noteItem.style.transition = 'transform 0.2s ease-out';
                     noteItem.style.transform = `translateX(-${maxSwipeDistance}px)`;
                     
@@ -1143,7 +1142,6 @@ _***all three***_"></div>
                         deleteNoteById(swipeNoteId);
                     }, 100);
                 } else {
-                    // Swipe wasn't far enough - snap back
                     noteItem.style.transition = 'transform 0.2s ease-out';
                     noteItem.style.transform = 'translateX(0px)';
                     
@@ -1154,11 +1152,9 @@ _***all three***_"></div>
                     }, 250);
                 }
             } else if (!isSwipeActive && swipeNoteId && deltaX <= minSwipeDistance) {
-                // This was a tap, not a swipe - handle the note click
                 selectNote(swipeNoteId);
             }
             
-            // Reset all states
             touchStarted = false;
             isSwipeActive = false;
             swipeDirectionLocked = false;
@@ -1167,32 +1163,7 @@ _***all three***_"></div>
             }
         }
 
-        function cancelSwipe() {
-            if (!touchStarted) return;
-            
-            const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
-            const noteItem = noteContainer ? noteContainer.querySelector('.note-item') : null;
-            
-            if (noteItem) {
-                noteItem.classList.remove('swiping');
-                noteItem.style.transition = 'transform 0.2s ease-out';
-                noteItem.style.transform = 'translateX(0px)';
-                
-                setTimeout(() => {
-                    if (noteItem) {
-                        noteItem.style.transition = '';
-                    }
-                }, 250);
-            }
-            
-            touchStarted = false;
-            isSwipeActive = false;
-            swipeDirectionLocked = false;
-            swipeNoteId = null;
-        }
-
         function handleNoteClick(e, noteId) {
-            // Only handle click if we're not in the middle of a swipe
             if (isSwipeActive) {
                 e.preventDefault();
                 return;
@@ -1255,7 +1226,6 @@ _***all three***_"></div>
                 noteContainer.className = 'note-swipe-container';
                 noteContainer.dataset.noteId = note.id;
                 
-                // Strip formatting for preview
                 const preview = note.content.replace(/[*_]/g, '').substring(0, 100);
                 
                 noteContainer.innerHTML = `
@@ -1384,14 +1354,11 @@ _***all three***_"></div>
             const editorActive = document.getElementById('editorContainer').classList.contains('active');
             
             if (editorActive) {
-                // If editor is open and user pressed back, close it
                 closeEditor();
             } else if (e.state && e.state.view === 'editor' && e.state.noteId) {
-                // If we're going forward to a note, open it
                 const note = notes.find(n => n.id === e.state.noteId);
                 if (note) {
                     currentNote = note;
-                    // Don't push another state since we're responding to popstate
                     document.getElementById('sidebar').classList.add('hidden');
                     document.getElementById('editorContainer').classList.add('active');
                     document.getElementById('fab').classList.add('hidden');
@@ -1402,12 +1369,12 @@ _***all three***_"></div>
                     
                     const formattedContent = convertTextToFormattedHTML(currentNote.content);
                     noteContent.innerHTML = formattedContent;
+                    lastProcessedContent = formattedContent;
                     
                     document.getElementById('pinBtn').classList.toggle('active', currentNote.isPinned);
                     
                     updateCharCount();
                     updateLastSaved();
-                    // Removed auto-focus here too
                 }
             }
         });
