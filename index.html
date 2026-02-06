@@ -218,7 +218,10 @@
             font-size: 13px;
             overflow: hidden;
             display: -webkit-box;
-            -webkit-line-clamp: 2; line-height: 1.2; margin-bottom: 4px;
+            -webkit-line-clamp: 2;
+            line-clamp: 2;
+            line-height: 1.2;
+            margin-bottom: 4px;
             -webkit-box-orient: vertical;
             margin-bottom: 6px;
             line-height: 1.3;
@@ -244,6 +247,7 @@
             transition: all 0.3s;
             opacity: 0;
             transform: translateY(-10px);
+            pointer-events: none;
         }
 
         .save-status.show {
@@ -534,6 +538,50 @@
             color: white;
         }
 
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* AI Modal specific styles */
+        .ai-input-group {
+            margin-bottom: 15px;
+        }
+        
+        .ai-label {
+            display: block;
+            margin-bottom: 5px;
+            font-size: 14px;
+            color: var(--text-secondary);
+        }
+        
+        .ai-input {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            font-size: 14px;
+        }
+        
+        .ai-input:focus {
+            outline: none;
+            border-color: var(--accent);
+        }
+
+        .ai-textarea {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            background-color: var(--bg-tertiary);
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            font-size: 14px;
+            min-height: 80px;
+            resize: vertical;
+        }
+
         /* Hide scrollbar but keep functionality */
         .notes-list::-webkit-scrollbar,
         .editor-content::-webkit-scrollbar {
@@ -602,6 +650,7 @@
                 <button class="back-btn" onclick="closeEditor()">‹</button>
                 <input type="text" class="editor-title" id="noteTitle" placeholder="Untitled Note">
                 <div class="editor-actions">
+                    <button class="action-btn" id="aiBtn" onclick="toggleAIModal()">✨</button>
                     <button class="action-btn" id="pinBtn" onclick="togglePin()">📌</button>
                 </div>
             </div>
@@ -610,15 +659,15 @@
                 <div class="editor-textarea" id="noteContent" contenteditable="true" 
                      data-placeholder="Start typing... 
 
-Formatting happens when you press space or pause:
-*bold text* → bold text
-**italic text** → italic text  
+Formatting Shortcuts (Type and press Space/Enter):
+*bold* → bold
+**italic** → italic
 ***bold italic*** → bold italic
-_underlined text_ → underlined text
+_underlined_ → underlined
 
-Combine them:
-_*bold + underlined*_
-_***all three***_"></div>
+> Type &gt; for quote
+# Type # for H1
+## Type ## for H2"></div>
             </div>
             
             <div class="editor-footer">
@@ -645,6 +694,23 @@ _***all three***_"></div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal()">Cancel</button>
                 <button class="btn btn-danger" onclick="confirmDelete()">Delete</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Modal -->
+    <div class="modal" id="aiModal">
+        <div class="modal-content">
+            <div class="modal-header">AI Assist ✨</div>
+            <div class="modal-body">
+                <div class="ai-input-group">
+                    <label class="ai-label">Gemini API Key</label>
+                    <input type="password" id="aiApiKey" class="ai-input" placeholder="Paste your API key here">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeAIModal()">Cancel</button>
+                <button class="btn btn-secondary" style="background-color: var(--accent); color: white;" onclick="runAITask()" id="runAiBtn">Restructure</button>
             </div>
         </div>
     </div>
@@ -810,10 +876,10 @@ _***all three***_"></div>
             const noteContent = document.getElementById('noteContent');
             noteContent.innerHTML = '';
             
-            // Convert plain text to formatted HTML
-            const formattedContent = convertTextToFormattedHTML(currentNote.content);
-            noteContent.innerHTML = formattedContent;
-            lastProcessedContent = formattedContent;
+            // Simple formatting for initial load (visual only, actual content is HTML in our new model)
+            // But wait, our 'currentNote.content' is now HTML from handleContentChange.
+            // So we just dump it in.
+            noteContent.innerHTML = currentNote.content;
             
             document.getElementById('pinBtn').classList.toggle('active', currentNote.isPinned);
             
@@ -841,163 +907,132 @@ _***all three***_"></div>
         function handleContentChange(e) {
             if (!currentNote || isProcessingInput) return;
             
-            // Update the note content with plain text
-            currentNote.content = getPlainText();
+            // Update the note content with the HTML content to preserve formatting
+            // We use innerHTML now because the formatting is DOM-based, not text-based
+            currentNote.content = document.getElementById('noteContent').innerHTML;
             updateCharCount();
             autoSave();
-            
-            // Schedule formatting processing
-            scheduleFormatting();
         }
 
-        function handleKeyDown(e) {
-            // Handle Enter key - let it work naturally then trigger updates
-            if (e.key === 'Enter') {
-                // Don't prevent default - let the browser handle it naturally
-                setTimeout(() => {
-                    handleContentChange();
-                    scheduleFormatting();
-                }, 0);
-                return;
-            }
-            
-            // Clear any pending formatting
-            clearTimeout(formatTimer);
-            
-            // For other keys, schedule formatting
-            if (e.key === ' ' || e.key === 'Tab') {
-                setTimeout(() => scheduleFormatting(), 100);
-            }
-        }
-
-        function handlePaste(e) {
-            e.preventDefault();
-            const text = (e.originalEvent || e).clipboardData.getData('text/plain');
-            
-            // Insert plain text at cursor position
-            const selection = window.getSelection();
-            const range = selection.getRangeAt(0);
-            range.deleteContents();
-            
-            const textNode = document.createTextNode(text);
-            range.insertNode(textNode);
-            range.setStartAfter(textNode);
-            range.setEndAfter(textNode);
-            selection.removeAllRanges();
-            selection.addRange(range);
-            
-            handleContentChange();
-            scheduleFormatting();
-        }
-
-        function scheduleFormatting() {
-            clearTimeout(formatTimer);
-            formatTimer = setTimeout(() => {
-                processFormatting();
-            }, 500); // Wait for 500ms of no typing before formatting
-        }
-
-        function getPlainText() {
-            const noteContent = document.getElementById('noteContent');
-            return noteContent.innerText || noteContent.textContent || '';
-        }
-
-        function processFormatting() {
-            if (isProcessingInput) return;
-            
-            const noteContent = document.getElementById('noteContent');
-            const plainText = getPlainText();
-            
-            // Only process if there are formatting characters
-            if (!/[*_]/.test(plainText)) {
-                return;
-            }
-            
-            const formattedHTML = convertTextToFormattedHTML(plainText);
-            
-            // Only update if content actually changed
-            if (formattedHTML !== lastProcessedContent) {
-                isProcessingInput = true;
-                
-                // Store current cursor position
+        async function handleKeyDown(e) {
+            // Handle Space and Enter for Markdown Shortcuts
+            if (e.key === ' ' || e.key === 'Enter') {
                 const selection = window.getSelection();
-                let cursorPosition = 0;
-                if (selection.rangeCount > 0) {
-                    const range = selection.getRangeAt(0);
-                    const preCaretRange = range.cloneRange();
-                    preCaretRange.selectNodeContents(noteContent);
-                    preCaretRange.setEnd(range.endContainer, range.endOffset);
-                    cursorPosition = preCaretRange.toString().length;
-                }
+                if (!selection.rangeCount) return;
                 
-                // Update content
-                noteContent.innerHTML = formattedHTML;
-                lastProcessedContent = formattedHTML;
+                const range = selection.getRangeAt(0);
+                const textNode = range.startContainer;
                 
-                // Restore cursor position
-                restoreCursorPosition(noteContent, cursorPosition);
-                
-                isProcessingInput = false;
-            }
-        }
+                // Only trigger if we are in a text node
+                if (textNode.nodeType === Node.TEXT_NODE) {
+                    const text = textNode.textContent;
+                    const cursorOffset = range.startOffset;
+                    const textBeforeCursor = text.slice(0, cursorOffset);
+                    
+                    // Patterns to check
+                    // We check strict patterns that end right at the cursor
+                    // The 'match' will capture the content inside the markers
+                    
+                    const patterns = [
+                        { regex: /(\*\*\*)([^*]+)(\*\*\*)$/, tag: 'span', className: 'bold-italic' }, // ***bold italic***
+                        { regex: /(\*\*)([^*]+)(\*\*)$/, tag: 'span', className: 'italic' },          // **italic**
+                        { regex: /(\*)([^*]+)(\*)$/, tag: 'span', className: 'bold' },              // *bold*
+                        { regex: /(_)([^_]+)(_)$/, tag: 'span', className: 'underline' },            // _underline_
+                    ];
 
-        function convertTextToFormattedHTML(text) {
-            // Escape HTML first
-            let html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-            
-            // Handle line breaks
-            html = html.replace(/\n/g, '<br>');
-            
-            // Process formatting patterns in order of specificity
-            html = html.replace(/_\*\*\*([^*_]+)\*\*\*_/g, '<span class="bold-italic-underline">$1</span>');
-            html = html.replace(/_\*\*([^*_]+)\*\*_/g, '<span class="italic-underline">$1</span>');
-            html = html.replace(/_\*([^*_]+)\*_/g, '<span class="bold-underline">$1</span>');
-            html = html.replace(/\*\*\*([^*_]+)\*\*\*/g, '<span class="bold-italic">$1</span>');
-            html = html.replace(/\*\*([^*_]+)\*\*/g, '<span class="italic">$1</span>');
-            html = html.replace(/\*([^*_]+)\*/g, '<span class="bold">$1</span>');
-            html = html.replace(/_([^*_]+)_/g, '<span class="underline">$1</span>');
-            
-            return html;
-        }
-
-        function restoreCursorPosition(element, position) {
-            try {
-                const walker = document.createTreeWalker(
-                    element,
-                    NodeFilter.SHOW_TEXT,
-                    null,
-                    false
-                );
-                
-                let currentPosition = 0;
-                let node;
-                
-                while (node = walker.nextNode()) {
-                    const nodeLength = node.textContent.length;
-                    if (currentPosition + nodeLength >= position) {
-                        const range = document.createRange();
-                        const selection = window.getSelection();
-                        
-                        const offset = Math.min(position - currentPosition, nodeLength);
-                        range.setStart(node, offset);
-                        range.collapse(true);
-                        
-                        selection.removeAllRanges();
-                        selection.addRange(range);
-                        break;
+                    for (const pattern of patterns) {
+                        const match = textBeforeCursor.match(pattern.regex);
+                        if (match) {
+                            // match[0] is the whole match (e.g. *bold*)
+                            // match[1] is the start marker
+                            // match[2] is the content
+                            // match[3] is the end marker
+                            
+                            // Prevent the space/enter from inserting yet if we want to handle it manually,
+                            // OR let it happen but after our modification.
+                            // Actually, if we modify DOM, the event default might fail or be weird.
+                            // Best to prevent default, process, then re-add the char if needed.
+                            
+                            // But wait, if we are in middle of text, replacing might be tricky.
+                            // Let's assume end-of-editing context.
+                            
+                            const matchLength = match[0].length;
+                            const matchStart = cursorOffset - matchLength;
+                            
+                            // Split the text node to isolate the part we want to replace
+                            // 1. Split at match end (cursor)
+                            const remainingText = textNode.splitText(cursorOffset);
+                            // 2. Split at match start
+                            const middleTextNode = textNode.splitText(matchStart);
+                            // Now middleTextNode contains exactly "*bold*"
+                            
+                            // Create the formatted element
+                            const span = document.createElement(pattern.tag);
+                            if (pattern.className) span.className = pattern.className;
+                            span.textContent = match[2]; // The inner content
+                            
+                            // Replace the plain text node with the span
+                            middleTextNode.parentNode.replaceChild(span, middleTextNode);
+                            
+                            // Add a Zero Width Space or just a regular Space after to break out of the style?
+                            // Browsers often merge typing into the previous span. 
+                            // Adding a ZWSP (\u200B) helps break the context.
+                            // If the user hit Space, we should add a real space.
+                            
+                            const suffix = document.createTextNode(e.key === 'Enter' ? '\n' : '\u00A0'); // nbsp for space to ensure visibility
+                            
+                            // If Enter, we might want default behavior, but we just modified DOM. 
+                            // execCommand('insertLineBreak') is safer for Enter.
+                            
+                            // Let's simplify: insert a normal space text node after.
+                            if (e.key === ' ') {
+                                // Insert space after the span
+                                const spaceNode = document.createTextNode('\u00A0');
+                                span.parentNode.insertBefore(spaceNode, remainingText);
+                                
+                                // Move cursor to after the space
+                                range.setStartAfter(spaceNode);
+                                range.setEndAfter(spaceNode);
+                                selection.removeAllRanges();
+                                selection.addRange(range);
+                                
+                                e.preventDefault(); // We handled the space
+                                handleContentChange(); // Trigger save
+                                return; 
+                            }
+                            
+                            // If Enter, we let the browser handle it? 
+                            // Often safer to prevent default and insert break manually to ensure we are OUT of the span.
+                            if (e.key === 'Enter') {
+                                // For now, let's just create the styling and let default Enter happen?
+                                // No, default enter might duplicate the span styling on the new line.
+                                // It's better to break out.
+                                
+                                const br = document.createElement('div'); // Standard block for new line in some browsers, or br
+                                // Actually, let's just insert a text node with space and let user continue?
+                                // No, Enter means new line.
+                                
+                                // Let's just finish the formatting replacement.
+                                // And let the event bubble? 
+                                // if we split the node, the cursor is at the beginning of 'remainingText'.
+                                // restoring cursor there.
+                                range.setStart(remainingText, 0);
+                                range.setEnd(remainingText, 0);
+                                selection.removeAllRanges();
+                                selection.addRange(range);
+                                
+                                // We rely on default behavior for Enter now, hopefully it works.
+                                handleContentChange();
+                                return;
+                            }
+                        }
                     }
-                    currentPosition += nodeLength;
                 }
-            } catch (e) {
-                // If cursor restoration fails, just place it at the end
-                const range = document.createRange();
-                const selection = window.getSelection();
-                range.selectNodeContents(element);
-                range.collapse(false);
-                selection.removeAllRanges();
-                selection.addRange(range);
             }
         }
+
+        // Removed legacy formatting functions:
+        // scheduleFormatting, getPlainText, processFormatting, convertTextToFormattedHTML, restoreCursorPosition
 
         function autoSave() {
             clearTimeout(autoSaveTimer);
@@ -1022,6 +1057,8 @@ _***all three***_"></div>
             currentNote.isPinned = !currentNote.isPinned;
             document.getElementById('pinBtn').classList.toggle('active', currentNote.isPinned);
             saveNotes();
+            // Force re-render of the list to show/hide pin icon in sidebar
+            renderNotesList();
         }
 
         function deleteNoteById(noteId) {
@@ -1239,7 +1276,7 @@ _***all three***_"></div>
             });
         }
 
-        function showSaveStatus(status) {
+        function showSaveStatus(status, customMessage = '') {
             const saveStatus = document.getElementById('saveStatus');
             const statusText = {
                 'saving': 'Saving...',
@@ -1247,11 +1284,11 @@ _***all three***_"></div>
                 'error': 'Save failed'
             };
             
-            saveStatus.textContent = statusText[status];
-            saveStatus.className = `save-status show ${status}`;
+            saveStatus.textContent = status === 'custom' ? customMessage : statusText[status];
+            saveStatus.className = `save-status show ${status === 'custom' ? 'saving' : status}`;
             
             clearTimeout(saveStatusTimer);
-            if (status !== 'saving') {
+            if (status !== 'saving' && status !== 'custom') {
                 saveStatusTimer = setTimeout(() => {
                     saveStatus.classList.remove('show');
                 }, 2000);
@@ -1329,10 +1366,143 @@ _***all three***_"></div>
             swipeNoteId = null;
         }
 
+        // AI Functions
+        function toggleAIModal() {
+            const savedKey = localStorage.getItem('gemini_api_key');
+            if (savedKey) {
+                // Auto-run if key exists
+                runAITask(savedKey);
+            } else {
+                // Show modal if no key
+                const modal = document.getElementById('aiModal');
+                modal.classList.add('show');
+                const savedKeyInput = localStorage.getItem('gemini_api_key');
+                if (savedKeyInput) document.getElementById('aiApiKey').value = savedKeyInput;
+            }
+        }
+
+        function closeAIModal() {
+            document.getElementById('aiModal').classList.remove('show');
+        }
+
+        async function runAITask(savedKey = null) {
+            if (!currentNote) return;
+            
+            let apiKey = savedKey;
+            
+            // If no saved key passed, get from input
+            if (!apiKey) {
+                apiKey = document.getElementById('aiApiKey').value.trim();
+                
+                if (!apiKey) {
+                    alert('Please enter a valid Gemini API Key');
+                    return;
+                }
+                
+                // Save settings
+                localStorage.setItem('gemini_api_key', apiKey);
+            }
+            
+            // UI Feedback
+            const btn = document.getElementById('runAiBtn');
+            const originalText = btn.textContent;
+            
+            if (!savedKey) {
+                // Modal is open
+                btn.textContent = 'Processing...';
+                btn.disabled = true;
+            } else {
+                // Background process
+                showSaveStatus('custom', '✨ AI Processing...');
+            }
+
+            // Hardcoded Strict Prompt
+            const systemPrompt = "Restructure the following text to improve grammar, typos, and clarity. Return ONLY the restructured text. Do NOT provide options. Do NOT include any preamble, introductory text, or markdown code blocks (like ```markdown). Just the text.";
+            
+            try {
+                const noteContent = currentNote.content; 
+                
+                // Construct the payload
+                const payload = {
+                    contents: [{
+                        parts: [{
+                            text: `${systemPrompt}\n\n${noteContent}`
+                        }]
+                    }]
+                };
+                
+                // Using gemini-flash-latest as it is free and stable
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error.message || 'API Error');
+                }
+                
+                if (data.candidates && data.candidates[0] && data.candidates[0].content) {
+                    const newContent = data.candidates[0].content.parts[0].text;
+                    
+                    // Simple logic: maintain line breaks but strip markdown if necessary, 
+                    // or let our new editor handle it? 
+                    // The AI returns Markdown usually.
+                    // We need to convert it to HTML for our editor.
+                    
+                    // Since we removed 'convertTextToFormattedHTML', we need a simple converter for initial load.
+                    // Or we just set innerText and let user format it?
+                    // Better: User `marked` library or simple replacement.
+                    // Since we are "Trigger based", we don't auto format bulk text.
+                    // So we just dump plain text?
+                    // User might want to see the bold text immediately.
+                    
+                    // For now, let's just use a very simple formatter for the AI output
+                    // to basic HTML so it looks nice.
+                    
+                    let htmlContent = newContent
+                        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+                        .replace(/\*\*(.*?)\*\*/g, '<span class="bold">$1</span>')
+                        .replace(/\*(.*?)\*/g, '<span class="italic">$1</span>') // single * is italic usually in MD
+                        .replace(/\n/g, '<br>');
+
+                    currentNote.content = htmlContent;
+                    document.getElementById('noteContent').innerHTML = htmlContent;
+                    
+                    // Save and re-format
+                    handleContentChange();
+                    closeAIModal();
+                    
+                    showSaveStatus('saved');
+                } else {
+                    throw new Error('Invalid response structure');
+                }
+                
+            } catch (e) {
+                console.error('AI Error:', e);
+                alert('AI Processing Failed: ' + e.message);
+                showSaveStatus('error');
+            } finally {
+                if (!savedKey) {
+                    btn.textContent = originalText;
+                    btn.disabled = false;
+                } else {
+                     // Hide status if success (saved will show) or error
+                     // But if error, alert showed. 
+                     // If success, 'saved' call in block handles it.
+                }
+            }
+        }
+
         // Event listeners
         window.onclick = function(event) {
             if (event.target.classList.contains('modal')) {
-                closeModal();
+                if (event.target.id === 'deleteModal') closeModal();
+                if (event.target.id === 'aiModal') closeAIModal();
             }
         }
 
@@ -1351,11 +1521,9 @@ _***all three***_"></div>
                     
                     document.getElementById('noteTitle').value = currentNote.title;
                     const noteContent = document.getElementById('noteContent');
-                    noteContent.innerHTML = '';
                     
-                    const formattedContent = convertTextToFormattedHTML(currentNote.content);
-                    noteContent.innerHTML = formattedContent;
-                    lastProcessedContent = formattedContent;
+                    // Direct HTML injection
+                    noteContent.innerHTML = currentNote.content;
                     
                     document.getElementById('pinBtn').classList.toggle('active', currentNote.isPinned);
                     
