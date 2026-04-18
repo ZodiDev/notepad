@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -314,13 +315,15 @@
             border: none;
             color: var(--text-primary);
             padding: 0;
-            min-width: 0; /* Allow shrinking */
+            min-width: 0;
+            /* Allow shrinking */
         }
 
         .editor-actions {
             display: flex;
             gap: 16px;
-            flex-shrink: 0; /* Prevent shrinking */
+            flex-shrink: 0;
+            /* Prevent shrinking */
         }
 
         .action-btn {
@@ -549,14 +552,14 @@
         .ai-input-group {
             margin-bottom: 15px;
         }
-        
+
         .ai-label {
             display: block;
             margin-bottom: 5px;
             font-size: 14px;
             color: var(--text-secondary);
         }
-        
+
         .ai-input {
             width: 100%;
             padding: 10px;
@@ -566,7 +569,7 @@
             color: var(--text-primary);
             font-size: 14px;
         }
-        
+
         .ai-input:focus {
             outline: none;
             border-color: var(--accent);
@@ -616,29 +619,39 @@
         .swipe-hint.show {
             opacity: 1;
         }
-    
-.note-swipe-container { min-height: auto; }
-.notes-list { overflow-y: auto; }
 
-/* Force exactly two columns at all widths */
-.notes-list { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+        .note-swipe-container {
+            min-height: auto;
+        }
 
-@media (max-width: 600px) {
-    .editor-header {
-        padding: 16px 10px; /* Reduce padding on mobile */
-    }
-    
-    .editor-actions {
-        gap: 8px; /* Tighter gap on mobile */
-    }
-    
-    .action-btn {
-        padding: 8px 4px; /* Tighter buttons */
-    }
-}
+        .notes-list {
+            overflow-y: auto;
+        }
 
-</style>
+        /* Force exactly two columns at all widths */
+        .notes-list {
+            grid-template-columns: repeat(2, minmax(0, 1fr)) !important;
+        }
+
+        @media (max-width: 600px) {
+            .editor-header {
+                padding: 16px 10px;
+                /* Reduce padding on mobile */
+            }
+
+            .editor-actions {
+                gap: 8px;
+                /* Tighter gap on mobile */
+            }
+
+            .action-btn {
+                padding: 8px 4px;
+                /* Tighter buttons */
+            }
+        }
+    </style>
 </head>
+
 <body>
     <!-- Save Status Indicator -->
     <div class="save-status" id="saveStatus"></div>
@@ -651,10 +664,14 @@
         <div class="sidebar" id="sidebar">
             <div class="sidebar-header">
                 <div class="app-title">Notes</div>
-                <input type="text" class="search-box" placeholder="Search notes..." id="searchBox">
+                <div style="display: flex; gap: 8px; margin-bottom: 10px;">
+                    <input type="text" class="search-box" style="margin-bottom: 0;" placeholder="Search notes..." id="searchBox">
+                    <button class="action-btn" onclick="openSettingsModal()" style="padding: 10px; background-color: var(--bg-secondary); border-radius: 10px;">⚙️</button>
+                </div>
                 <div class="filter-buttons">
                     <button class="filter-btn active" onclick="filterNotes('all')">All</button>
                     <button class="filter-btn" onclick="filterNotes('pinned')">Pinned</button>
+                    <button class="filter-btn" onclick="filterNotes('private')">Private</button>
                 </div>
             </div>
             <div class="notes-list" id="notesList"></div>
@@ -666,14 +683,14 @@
                 <button class="back-btn" onclick="closeEditor()">‹</button>
                 <input type="text" class="editor-title" id="noteTitle" placeholder="Untitled Note">
                 <div class="editor-actions">
+                    <button class="action-btn" id="lockBtn" onclick="togglePrivate()">🔒</button>
                     <button class="action-btn" id="aiBtn" onclick="toggleAIModal()">✨</button>
                     <button class="action-btn" id="pinBtn" onclick="togglePin()">📌</button>
                 </div>
             </div>
-            
+
             <div class="editor-content">
-                <div class="editor-textarea" id="noteContent" contenteditable="true" 
-                     data-placeholder="Start typing... 
+                <div class="editor-textarea" id="noteContent" contenteditable="true" data-placeholder="Start typing... 
 
 Formatting Shortcuts (Type and press Space/Enter):
 *bold* → bold
@@ -685,7 +702,7 @@ _underlined_ → underlined
 # Type # for H1
 ## Type ## for H2"></div>
             </div>
-            
+
             <div class="editor-footer">
                 <span id="lastSaved">Auto-saved</span>
                 <span id="charCount">0 characters</span>
@@ -699,6 +716,61 @@ _underlined_ → underlined
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
         </svg>
     </button>
+
+    <!-- PIN Setup Modal -->
+    <div class="modal" id="pinSetupModal">
+        <div class="modal-content">
+            <div class="modal-header">Setup Private PIN 🔒</div>
+            <div class="modal-body">
+                <p>Create a PIN to secure your private notes.</p>
+                <div class="ai-input-group" style="margin-top: 15px;">
+                    <input type="password" id="newPinInput" class="ai-input" placeholder="Enter PIN (min 4 digits)" maxlength="8">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closePinSetupModal()">Cancel</button>
+                <button class="btn btn-secondary" style="background-color: var(--accent); color: white;" onclick="savePinSetup()">Save PIN</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Unlock Modal -->
+    <div class="modal" id="unlockModal">
+        <div class="modal-content">
+            <div class="modal-header">Unlock Note 🔒</div>
+            <div class="modal-body">
+                <p>Enter your PIN to view this note.</p>
+                <div class="ai-input-group" style="margin-top: 15px;">
+                    <input type="password" id="unlockPinInput" class="ai-input" placeholder="Enter PIN">
+                </div>
+                <button id="biometricBtn" class="btn btn-secondary" style="width: 100%; margin-top: 10px; display: none;" onclick="tryBiometrics()">
+                    Use Fingerprint / FaceID
+                </button>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeUnlockModal()">Cancel</button>
+                <button class="btn btn-secondary" style="background-color: var(--accent); color: white;" onclick="submitUnlock()">Unlock</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">Settings ⚙️</div>
+            <div class="modal-body">
+                <div id="changePinSection">
+                    <p style="margin-bottom: 10px;"><b>Change PIN</b></p>
+                    <input type="password" id="oldPinInput" class="ai-input" placeholder="Current PIN" style="margin-bottom: 15px;">
+                    <input type="password" id="newPinChangeInput" class="ai-input" placeholder="New PIN (min 4 digits)" maxlength="8">
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeSettingsModal()">Close</button>
+                <button class="btn btn-secondary" style="background-color: var(--accent); color: white;" onclick="changePin()">Update</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Delete Confirmation Modal -->
     <div class="modal" id="deleteModal">
@@ -726,7 +798,8 @@ _underlined_ → underlined
             </div>
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeAIModal()">Cancel</button>
-                <button class="btn btn-secondary" style="background-color: var(--accent); color: white;" onclick="runAITask()" id="runAiBtn">Restructure</button>
+                <button class="btn btn-secondary" style="background-color: var(--accent); color: white;"
+                    onclick="runAITask()" id="runAiBtn">Restructure</button>
             </div>
         </div>
     </div>
@@ -739,13 +812,23 @@ _underlined_ → underlined
             font-style: italic;
             white-space: pre-wrap;
         }
-        
+
         .editor-textarea:focus:before {
             opacity: 0.7;
         }
-        
+
         .editor-textarea:not(:empty):before {
             display: none;
+        }
+
+        .note-item.blurred .note-item-title,
+        .note-item.blurred .note-item-preview,
+        .note-item.blurred .note-item-icons,
+        .note-item.blurred .note-item-meta {
+            filter: blur(8px);
+            opacity: 0.6;
+            user-select: none;
+            pointer-events: none;
         }
     </style>
 
@@ -759,6 +842,11 @@ _underlined_ → underlined
         let saveStatusTimer = null;
         let swipeNoteId = null;
         let isProcessingInput = false;
+
+        // Privacy State
+        let currentLockHash = localStorage.getItem('notesPinHash') || null;
+        let isBiometricsEnabled = localStorage.getItem('notesBioEnabled') === 'true';
+        let currentlyUnlockedNoteId = null; // keeps track of user session unlock
 
         // Improved swipe state management
         let touchStarted = false;
@@ -777,10 +865,10 @@ _underlined_ → underlined
         let lastProcessedContent = '';
 
         // Initialize
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             loadNotes();
             renderNotesList();
-            
+
             // Handle initial URL if there's a note hash
             if (window.location.hash && window.location.hash.startsWith('#note-')) {
                 const noteId = window.location.hash.replace('#note-', '');
@@ -794,16 +882,16 @@ _underlined_ → underlined
             } else {
                 history.replaceState({ view: 'list' }, '', window.location.pathname);
             }
-            
+
             // Event listeners
             document.getElementById('searchBox').addEventListener('input', handleSearch);
             document.getElementById('noteTitle').addEventListener('input', handleTitleChange);
-            
+
             const noteContent = document.getElementById('noteContent');
             noteContent.addEventListener('input', handleContentChange);
             noteContent.addEventListener('keydown', handleKeyDown);
             noteContent.addEventListener('paste', handlePaste);
-            
+
             // Create demo notes if none exist
             if (notes.length === 0) {
                 createDemoNotes();
@@ -838,7 +926,7 @@ _underlined_ → underlined
                     isPinned: false
                 }
             ];
-            
+
             notes = demoNotes;
             saveNotes();
         }
@@ -863,9 +951,10 @@ _underlined_ → underlined
                 content: '',
                 createdAt: new Date().toISOString(),
                 updatedAt: new Date().toISOString(),
-                isPinned: false
+                isPinned: false,
+                isPrivate: false
             };
-            
+
             notes.unshift(newNote);
             currentNote = newNote;
             saveNotes();
@@ -873,32 +962,40 @@ _underlined_ → underlined
             openEditor();
         }
 
-        function selectNote(noteId) {
-            currentNote = notes.find(note => note.id === noteId);
-            if (!currentNote) return;
+        function selectNote(noteId, skipAuth = false) {
+            const note = notes.find(note => note.id === noteId);
+            if (!note) return;
+
+            if (note.isPrivate && !skipAuth && currentlyUnlockedNoteId !== noteId) {
+                openUnlockModal(noteId);
+                return;
+            }
+
+            currentNote = note;
             openEditor();
         }
 
         function openEditor() {
             if (!currentNote) return;
-            
+
             history.pushState({ view: 'editor', noteId: currentNote.id }, '', `#note-${currentNote.id}`);
-            
+
             document.getElementById('sidebar').classList.add('hidden');
             document.getElementById('editorContainer').classList.add('active');
             document.getElementById('fab').classList.add('hidden');
-            
+
             document.getElementById('noteTitle').value = currentNote.title;
             const noteContent = document.getElementById('noteContent');
             noteContent.innerHTML = '';
-            
+
             // Simple formatting for initial load (visual only, actual content is HTML in our new model)
             // But wait, our 'currentNote.content' is now HTML from handleContentChange.
             // So we just dump it in.
             noteContent.innerHTML = currentNote.content;
-            
+
             document.getElementById('pinBtn').classList.toggle('active', currentNote.isPinned);
-            
+            document.getElementById('lockBtn').classList.toggle('active', currentNote.isPrivate);
+
             updateCharCount();
             updateLastSaved();
         }
@@ -907,8 +1004,9 @@ _underlined_ → underlined
             document.getElementById('sidebar').classList.remove('hidden');
             document.getElementById('editorContainer').classList.remove('active');
             document.getElementById('fab').classList.remove('hidden');
+            currentlyUnlockedNoteId = null; // Lock again on exit
             renderNotesList();
-            
+
             if (window.location.hash) {
                 history.replaceState({ view: 'list' }, '', window.location.pathname);
             }
@@ -922,7 +1020,7 @@ _underlined_ → underlined
 
         function handleContentChange(e) {
             if (!currentNote || isProcessingInput) return;
-            
+
             // Update the note content with the HTML content to preserve formatting
             // We use innerHTML now because the formatting is DOM-based, not text-based
             currentNote.content = document.getElementById('noteContent').innerHTML;
@@ -935,20 +1033,20 @@ _underlined_ → underlined
             if (e.key === ' ' || e.key === 'Enter') {
                 const selection = window.getSelection();
                 if (!selection.rangeCount) return;
-                
+
                 const range = selection.getRangeAt(0);
                 const textNode = range.startContainer;
-                
+
                 // Only trigger if we are in a text node
                 if (textNode.nodeType === Node.TEXT_NODE) {
                     const text = textNode.textContent;
                     const cursorOffset = range.startOffset;
                     const textBeforeCursor = text.slice(0, cursorOffset);
-                    
+
                     // Patterns to check
                     // We check strict patterns that end right at the cursor
                     // The 'match' will capture the content inside the markers
-                    
+
                     const patterns = [
                         { regex: /(\*\*\*)([^*]+)(\*\*\*)$/, tag: 'span', className: 'bold-italic' }, // ***bold italic***
                         { regex: /(\*\*)([^*]+)(\*\*)$/, tag: 'span', className: 'italic' },          // **italic**
@@ -963,71 +1061,71 @@ _underlined_ → underlined
                             // match[1] is the start marker
                             // match[2] is the content
                             // match[3] is the end marker
-                            
+
                             // Prevent the space/enter from inserting yet if we want to handle it manually,
                             // OR let it happen but after our modification.
                             // Actually, if we modify DOM, the event default might fail or be weird.
                             // Best to prevent default, process, then re-add the char if needed.
-                            
+
                             // But wait, if we are in middle of text, replacing might be tricky.
                             // Let's assume end-of-editing context.
-                            
+
                             const matchLength = match[0].length;
                             const matchStart = cursorOffset - matchLength;
-                            
+
                             // Split the text node to isolate the part we want to replace
                             // 1. Split at match end (cursor)
                             const remainingText = textNode.splitText(cursorOffset);
                             // 2. Split at match start
                             const middleTextNode = textNode.splitText(matchStart);
                             // Now middleTextNode contains exactly "*bold*"
-                            
+
                             // Create the formatted element
                             const span = document.createElement(pattern.tag);
                             if (pattern.className) span.className = pattern.className;
                             span.textContent = match[2]; // The inner content
-                            
+
                             // Replace the plain text node with the span
                             middleTextNode.parentNode.replaceChild(span, middleTextNode);
-                            
+
                             // Add a Zero Width Space or just a regular Space after to break out of the style?
                             // Browsers often merge typing into the previous span. 
                             // Adding a ZWSP (\u200B) helps break the context.
                             // If the user hit Space, we should add a real space.
-                            
+
                             const suffix = document.createTextNode(e.key === 'Enter' ? '\n' : '\u00A0'); // nbsp for space to ensure visibility
-                            
+
                             // If Enter, we might want default behavior, but we just modified DOM. 
                             // execCommand('insertLineBreak') is safer for Enter.
-                            
+
                             // Let's simplify: insert a normal space text node after.
                             if (e.key === ' ') {
                                 // Insert space after the span
                                 const spaceNode = document.createTextNode('\u00A0');
                                 span.parentNode.insertBefore(spaceNode, remainingText);
-                                
+
                                 // Move cursor to after the space
                                 range.setStartAfter(spaceNode);
                                 range.setEndAfter(spaceNode);
                                 selection.removeAllRanges();
                                 selection.addRange(range);
-                                
+
                                 e.preventDefault(); // We handled the space
                                 handleContentChange(); // Trigger save
-                                return; 
+                                return;
                             }
-                            
+
                             // If Enter, we let the browser handle it? 
                             // Often safer to prevent default and insert break manually to ensure we are OUT of the span.
                             if (e.key === 'Enter') {
                                 // For now, let's just create the styling and let default Enter happen?
                                 // No, default enter might duplicate the span styling on the new line.
                                 // It's better to break out.
-                                
+
                                 const br = document.createElement('div'); // Standard block for new line in some browsers, or br
                                 // Actually, let's just insert a text node with space and let user continue?
                                 // No, Enter means new line.
-                                
+
                                 // Let's just finish the formatting replacement.
                                 // And let the event bubble? 
                                 // if we split the node, the cursor is at the beginning of 'remainingText'.
@@ -1036,7 +1134,7 @@ _underlined_ → underlined
                                 range.setEnd(remainingText, 0);
                                 selection.removeAllRanges();
                                 selection.addRange(range);
-                                
+
                                 // We rely on default behavior for Enter now, hopefully it works.
                                 handleContentChange();
                                 return;
@@ -1053,7 +1151,7 @@ _underlined_ → underlined
         function autoSave() {
             clearTimeout(autoSaveTimer);
             showSaveStatus('saving');
-            
+
             autoSaveTimer = setTimeout(() => {
                 if (currentNote) {
                     currentNote.updatedAt = new Date().toISOString();
@@ -1084,20 +1182,20 @@ _underlined_ → underlined
 
         function confirmDelete() {
             if (!swipeNoteId) return;
-            
+
             notes = notes.filter(note => note.id !== swipeNoteId);
             saveNotes();
-            
+
             if (currentNote && currentNote.id === swipeNoteId) {
                 currentNote = null;
                 closeEditor();
                 history.replaceState({ view: 'list' }, '', window.location.pathname);
             }
-            
+
             const modal = document.getElementById('deleteModal');
             modal.classList.remove('show');
             swipeNoteId = null;
-            
+
             renderNotesList();
         }
 
@@ -1106,30 +1204,30 @@ _underlined_ → underlined
             touchStarted = true;
             isSwipeActive = false;
             swipeDirectionLocked = false;
-            
+
             const touch = e.touches[0];
             startX = touch.clientX;
             startY = touch.clientY;
             currentX = startX;
             currentY = startY;
-            
+
             swipeNoteId = noteId;
         }
 
         function handleTouchMove(e) {
             if (!touchStarted) return;
-            
+
             const touch = e.touches[0];
             currentX = touch.clientX;
             currentY = touch.clientY;
-            
+
             const deltaX = startX - currentX;
             const deltaY = Math.abs(currentY - startY);
             const absDeltaX = Math.abs(deltaX);
-            
+
             if (!swipeDirectionLocked && (absDeltaX > minSwipeDistance || deltaY > minSwipeDistance)) {
                 swipeDirectionLocked = true;
-                
+
                 if (absDeltaX > deltaY && deltaX > 0) {
                     isSwipeActive = true;
                     const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
@@ -1143,18 +1241,18 @@ _underlined_ → underlined
                     return;
                 }
             }
-            
+
             if (isSwipeActive) {
                 e.preventDefault();
-                
+
                 if (deltaX > 0) {
                     const swipeDistance = Math.min(deltaX, maxSwipeDistance);
                     const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
                     const noteItem = noteContainer ? noteContainer.querySelector('.note-item') : null;
-                    
+
                     if (noteItem) {
                         noteItem.style.transform = `translateX(-${swipeDistance}px)`;
-                        
+
                         if (deltaX > swipeThreshold * 0.7) {
                             noteItem.style.transition = 'none';
                         }
@@ -1165,25 +1263,25 @@ _underlined_ → underlined
 
         function handleTouchEnd(e) {
             if (!touchStarted) return;
-            
+
             const deltaX = startX - currentX;
             const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
             const noteItem = noteContainer ? noteContainer.querySelector('.note-item') : null;
-            
+
             if (isSwipeActive && noteItem) {
                 noteItem.classList.remove('swiping');
-                
+
                 if (deltaX > swipeThreshold) {
                     noteItem.style.transition = 'transform 0.2s ease-out';
                     noteItem.style.transform = `translateX(-${maxSwipeDistance}px)`;
-                    
+
                     setTimeout(() => {
                         deleteNoteById(swipeNoteId);
                     }, 100);
                 } else {
                     noteItem.style.transition = 'transform 0.2s ease-out';
                     noteItem.style.transform = 'translateX(0px)';
-                    
+
                     setTimeout(() => {
                         if (noteItem) {
                             noteItem.style.transition = '';
@@ -1193,7 +1291,7 @@ _underlined_ → underlined
             } else if (!isSwipeActive && swipeNoteId && deltaX <= minSwipeDistance) {
                 selectNote(swipeNoteId);
             }
-            
+
             touchStarted = false;
             isSwipeActive = false;
             swipeDirectionLocked = false;
@@ -1229,26 +1327,30 @@ _underlined_ → underlined
         function renderNotesList() {
             const notesList = document.getElementById('notesList');
             let filteredNotes = notes;
-            
+
             if (filterType === 'pinned') {
-                filteredNotes = filteredNotes.filter(note => note.isPinned);
+                filteredNotes = filteredNotes.filter(note => note.isPinned && !note.isPrivate);
+            } else if (filterType === 'private') {
+                filteredNotes = filteredNotes.filter(note => note.isPrivate);
+            } else {
+                filteredNotes = filteredNotes.filter(note => !note.isPrivate);
             }
-            
+
             if (searchTerm) {
-                filteredNotes = filteredNotes.filter(note => 
+                filteredNotes = filteredNotes.filter(note =>
                     note.title.toLowerCase().includes(searchTerm) ||
                     note.content.toLowerCase().includes(searchTerm)
                 );
             }
-            
+
             filteredNotes.sort((a, b) => {
                 if (a.isPinned && !b.isPinned) return -1;
                 if (!a.isPinned && b.isPinned) return 1;
                 return new Date(b.updatedAt) - new Date(a.updatedAt);
             });
-            
+
             notesList.innerHTML = '';
-            
+
             if (filteredNotes.length === 0) {
                 notesList.innerHTML = `
                     <div class="empty-state">
@@ -1259,35 +1361,38 @@ _underlined_ → underlined
                 `;
                 return;
             }
-            
+
             filteredNotes.forEach(note => {
                 const noteContainer = document.createElement('div');
                 noteContainer.className = 'note-swipe-container';
                 noteContainer.dataset.noteId = note.id;
-                
-                const preview = note.content.replace(/[*_]/g, '').substring(0, 100);
-                
+
+                const isLocked = note.isPrivate && currentlyUnlockedNoteId !== note.id;
+                let preview = note.content.replace(/[*_]/g, '').substring(0, 100);
+
+                let title = note.title;
+
                 noteContainer.innerHTML = `
                     <div class="note-swipe-background">
                         🗑️
                     </div>
-                    <div class="note-item ${note.isPinned ? 'pinned' : ''}">
+                    <div class="note-item ${note.isPinned ? 'pinned' : ''} ${isLocked ? 'blurred' : ''}">
                         <div class="note-item-header">
-                            <div class="note-item-title">${note.title}</div>
+                            <div class="note-item-title">${title}</div>
                             <div class="note-item-icons">
                                 ${note.isPinned ? '<span class="pin-icon pinned">📌</span>' : ''}
                             </div>
                         </div>
-                        <div class="note-item-preview">${preview}${note.content.length > 100 ? '...' : ''}</div>
+                        <div class="note-item-preview">${preview}${(!isLocked && note.content.length > 100) ? '...' : ''}</div>
                         <div class="note-item-meta">${formatDate(note.updatedAt)}</div>
                     </div>
                 `;
-                
+
                 noteContainer.addEventListener('touchstart', (e) => handleTouchStart(e, note.id), { passive: false });
                 noteContainer.addEventListener('touchmove', handleTouchMove, { passive: false });
                 noteContainer.addEventListener('touchend', handleTouchEnd, { passive: false });
                 noteContainer.addEventListener('click', (e) => handleNoteClick(e, note.id));
-                
+
                 notesList.appendChild(noteContainer);
             });
         }
@@ -1299,10 +1404,10 @@ _underlined_ → underlined
                 'saved': 'Saved!',
                 'error': 'Save failed'
             };
-            
+
             saveStatus.textContent = status === 'custom' ? customMessage : statusText[status];
             saveStatus.className = `save-status show ${status === 'custom' ? 'saving' : status}`;
-            
+
             clearTimeout(saveStatusTimer);
             if (status !== 'saving' && status !== 'custom') {
                 saveStatusTimer = setTimeout(() => {
@@ -1324,13 +1429,215 @@ _underlined_ → underlined
             const date = new Date(dateString);
             const now = new Date();
             const diff = now - date;
-            
+
             if (diff < 60000) return 'Just now';
             if (diff < 3600000) return `${Math.floor(diff / 60000)}m ago`;
             if (diff < 86400000) return `${Math.floor(diff / 3600000)}h ago`;
             if (diff < 604800000) return `${Math.floor(diff / 86400000)}d ago`;
-            
+
             return date.toLocaleDateString();
+        }
+
+        // Privacy & Auth Functions
+        function closePinSetupModal() {
+            document.getElementById('pinSetupModal').classList.remove('show');
+            document.getElementById('newPinInput').value = '';
+        }
+
+        function bufferToBase64url(buffer) {
+            const bytes = new Uint8Array(buffer);
+            let str = '';
+            for (let charCode of bytes) {
+                str += String.fromCharCode(charCode);
+            }
+            return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
+        }
+
+        function base64urlToBuffer(base64url) {
+            const padding = '='.repeat((4 - base64url.length % 4) % 4);
+            const base64 = (base64url + padding).replace(/\-/g, '+').replace(/_/g, '/');
+            const rawData = atob(base64);
+            const outputArray = new Uint8Array(rawData.length);
+            for (let i = 0; i < rawData.length; ++i) {
+                outputArray[i] = rawData.charCodeAt(i);
+            }
+            return outputArray.buffer;
+        }
+
+        async function savePinSetup() {
+            const pin = document.getElementById('newPinInput').value;
+            if (pin.length < 4) {
+                alert('PIN must be at least 4 digits long.');
+                return;
+            }
+            
+            const hash = await hashString(pin);
+            localStorage.setItem('notesPinHash', hash);
+            currentLockHash = hash;
+
+            // Attempt Biometric Setup automatically as priority
+            if (window.PublicKeyCredential) {
+                try {
+                    const isAvailable = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
+                    if (isAvailable) {
+                        const publicKey = {
+                            challenge: new Uint8Array(32),
+                            rp: { name: "Notes App", id: window.location.hostname || "localhost" },
+                            user: { id: new Uint8Array(16), name: "user@notes.local", displayName: "Local User" },
+                            pubKeyCredParams: [{ type: "public-key", alg: -7 }],
+                            authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
+                            timeout: 60000
+                        };
+                        const credential = await navigator.credentials.create({ publicKey });
+                        localStorage.setItem('notesBioCredId', bufferToBase64url(credential.rawId));
+                        isBiometricsEnabled = true;
+                    }
+                } catch (e) {
+                    console.warn("Biometrics setup skipped or failed (unsupported origin/device):", e);
+                }
+            }
+
+            closePinSetupModal();
+            if (currentNote) {
+                currentNote.isPrivate = true;
+                currentlyUnlockedNoteId = currentNote.id; 
+                document.getElementById('lockBtn').classList.add('active');
+                saveNotes();
+                renderNotesList();
+            }
+        }
+
+        async function hashString(str) {
+            const encoder = new TextEncoder();
+            const data = encoder.encode(str);
+            const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+            const hashArray = Array.from(new Uint8Array(hashBuffer));
+            return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+        }
+
+        function togglePrivate() {
+            if (!currentNote) return;
+
+            if (!currentNote.isPrivate) {
+                if (!currentLockHash) {
+                    document.getElementById('pinSetupModal').classList.add('show');
+                } else {
+                    currentNote.isPrivate = true;
+                    currentlyUnlockedNoteId = currentNote.id;
+                    document.getElementById('lockBtn').classList.add('active');
+                    saveNotes();
+                    renderNotesList();
+                }
+            } else {
+                currentNote.isPrivate = false;
+                document.getElementById('lockBtn').classList.remove('active');
+                saveNotes();
+                renderNotesList();
+            }
+        }
+
+        let noteToUnlock = null;
+        
+        function openUnlockModal(noteId) {
+            noteToUnlock = noteId;
+            const credId = localStorage.getItem('notesBioCredId');
+            
+            document.getElementById('unlockModal').classList.add('show');
+            document.getElementById('unlockPinInput').value = '';
+            
+            if (credId && window.PublicKeyCredential) {
+                document.getElementById('biometricBtn').style.display = 'block';
+                // Auto-prompt biometrics if supported
+                setTimeout(tryBiometrics, 100);
+            } else {
+                document.getElementById('biometricBtn').style.display = 'none';
+                setTimeout(() => document.getElementById('unlockPinInput').focus(), 100);
+            }
+        }
+
+        function closeUnlockModal() {
+            document.getElementById('unlockModal').classList.remove('show');
+            document.getElementById('unlockPinInput').value = '';
+            noteToUnlock = null;
+        }
+
+        async function submitUnlock() {
+            const pin = document.getElementById('unlockPinInput').value;
+            const hash = await hashString(pin);
+            if (hash === currentLockHash) {
+                handleSuccessfulUnlock();
+            } else {
+                alert('Incorrect PIN');
+                document.getElementById('unlockPinInput').value = '';
+            }
+        }
+
+        async function tryBiometrics() {
+            const credIdBase64 = localStorage.getItem('notesBioCredId');
+            if (!credIdBase64 || !window.PublicKeyCredential) return;
+            
+            try {
+                const publicKey = {
+                    challenge: new Uint8Array(32),
+                    allowCredentials: [{
+                        id: base64urlToBuffer(credIdBase64),
+                        type: 'public-key',
+                        transports: ['internal']
+                    }],
+                    userVerification: "required",
+                    timeout: 60000
+                };
+                await navigator.credentials.get({ publicKey });
+                handleSuccessfulUnlock();
+            } catch(e) {
+                console.warn("Biometrics failed or cancelled:", e);
+                document.getElementById('unlockPinInput').focus();
+            }
+        }
+
+        function handleSuccessfulUnlock() {
+            currentlyUnlockedNoteId = noteToUnlock;
+            const targetNoteId = noteToUnlock;
+            closeUnlockModal();
+            selectNote(targetNoteId, true);
+        }
+
+        // Settings Functions
+        function openSettingsModal() {
+            document.getElementById('settingsModal').classList.add('show');
+        }
+
+        function closeSettingsModal() {
+            document.getElementById('settingsModal').classList.remove('show');
+            document.getElementById('oldPinInput').value = '';
+            document.getElementById('newPinChangeInput').value = '';
+        }
+
+        async function changePin() {
+            const oldPin = document.getElementById('oldPinInput').value;
+            const newPin = document.getElementById('newPinChangeInput').value;
+            
+            if (!currentLockHash) {
+                alert("You don't have a PIN set up yet.");
+                return;
+            }
+
+            const oldHash = await hashString(oldPin);
+            if (oldHash !== currentLockHash) {
+                alert("Incorrect Current PIN.");
+                return;
+            }
+
+            if (newPin.length < 4) {
+                alert("New PIN must be at least 4 digits long.");
+                return;
+            }
+
+            const newHash = await hashString(newPin);
+            localStorage.setItem('notesPinHash', newHash);
+            currentLockHash = newHash;
+            alert("PIN updated successfully.");
+            closeSettingsModal();
         }
 
         // Storage Functions
@@ -1359,17 +1666,17 @@ _underlined_ → underlined
         function closeModal() {
             const modal = document.getElementById('deleteModal');
             modal.classList.remove('show');
-            
+
             if (swipeNoteId) {
                 const noteContainer = document.querySelector(`[data-note-id="${swipeNoteId}"]`);
-                
+
                 if (noteContainer) {
                     const noteItem = noteContainer.querySelector('.note-item');
-                    
+
                     if (noteItem) {
                         noteItem.style.transition = 'transform 0.3s ease-out';
                         noteItem.style.transform = 'translateX(0px)';
-                        
+
                         setTimeout(() => {
                             if (noteItem) {
                                 noteItem.style.transition = '';
@@ -1378,7 +1685,7 @@ _underlined_ → underlined
                     }
                 }
             }
-            
+
             swipeNoteId = null;
         }
 
@@ -1403,26 +1710,26 @@ _underlined_ → underlined
 
         async function runAITask(savedKey = null) {
             if (!currentNote) return;
-            
+
             let apiKey = savedKey;
-            
+
             // If no saved key passed, get from input
             if (!apiKey) {
                 apiKey = document.getElementById('aiApiKey').value.trim();
-                
+
                 if (!apiKey) {
                     alert('Please enter a valid Gemini API Key');
                     return;
                 }
-                
+
                 // Save settings
                 localStorage.setItem('gemini_api_key', apiKey);
             }
-            
+
             // UI Feedback
             const btn = document.getElementById('runAiBtn');
             const originalText = btn.textContent;
-            
+
             if (!savedKey) {
                 // Modal is open
                 btn.textContent = 'Processing...';
@@ -1434,10 +1741,10 @@ _underlined_ → underlined
 
             // Hardcoded Strict Prompt
             const systemPrompt = "Restructure the following text to improve grammar, typos, and clarity. Return ONLY the restructured text. Do NOT provide options. Do NOT include any preamble, introductory text, or markdown code blocks (like ```markdown). Just the text.";
-            
+
             try {
-                const noteContent = currentNote.content; 
-                
+                const noteContent = currentNote.content;
+
                 // Construct the payload
                 const payload = {
                     contents: [{
@@ -1446,7 +1753,7 @@ _underlined_ → underlined
                         }]
                     }]
                 };
-                
+
                 // Using gemini-flash-latest as it is free and stable
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-latest:generateContent?key=${apiKey}`, {
                     method: 'POST',
@@ -1455,31 +1762,31 @@ _underlined_ → underlined
                     },
                     body: JSON.stringify(payload)
                 });
-                
+
                 const data = await response.json();
-                
+
                 if (data.error) {
                     throw new Error(data.error.message || 'API Error');
                 }
-                
+
                 if (data.candidates && data.candidates[0] && data.candidates[0].content) {
                     const newContent = data.candidates[0].content.parts[0].text;
-                    
+
                     // Simple logic: maintain line breaks but strip markdown if necessary, 
                     // or let our new editor handle it? 
                     // The AI returns Markdown usually.
                     // We need to convert it to HTML for our editor.
-                    
+
                     // Since we removed 'convertTextToFormattedHTML', we need a simple converter for initial load.
                     // Or we just set innerText and let user format it?
                     // Better: User `marked` library or simple replacement.
                     // Since we are "Trigger based", we don't auto format bulk text.
                     // So we just dump plain text?
                     // User might want to see the bold text immediately.
-                    
+
                     // For now, let's just use a very simple formatter for the AI output
                     // to basic HTML so it looks nice.
-                    
+
                     let htmlContent = newContent
                         .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
                         .replace(/\*\*(.*?)\*\*/g, '<span class="bold">$1</span>')
@@ -1488,16 +1795,16 @@ _underlined_ → underlined
 
                     currentNote.content = htmlContent;
                     document.getElementById('noteContent').innerHTML = htmlContent;
-                    
+
                     // Save and re-format
                     handleContentChange();
                     closeAIModal();
-                    
+
                     showSaveStatus('saved');
                 } else {
                     throw new Error('Invalid response structure');
                 }
-                
+
             } catch (e) {
                 console.error('AI Error:', e);
                 alert('AI Processing Failed: ' + e.message);
@@ -1507,24 +1814,27 @@ _underlined_ → underlined
                     btn.textContent = originalText;
                     btn.disabled = false;
                 } else {
-                     // Hide status if success (saved will show) or error
-                     // But if error, alert showed. 
-                     // If success, 'saved' call in block handles it.
+                    // Hide status if success (saved will show) or error
+                    // But if error, alert showed. 
+                    // If success, 'saved' call in block handles it.
                 }
             }
         }
 
         // Event listeners
-        window.onclick = function(event) {
+        window.onclick = function (event) {
             if (event.target.classList.contains('modal')) {
                 if (event.target.id === 'deleteModal') closeModal();
                 if (event.target.id === 'aiModal') closeAIModal();
+                if (event.target.id === 'pinSetupModal') closePinSetupModal();
+                if (event.target.id === 'unlockModal') closeUnlockModal();
+                if (event.target.id === 'settingsModal') closeSettingsModal();
             }
         }
 
-        window.addEventListener('popstate', function(e) {
+        window.addEventListener('popstate', function (e) {
             const editorActive = document.getElementById('editorContainer').classList.contains('active');
-            
+
             if (editorActive) {
                 closeEditor();
             } else if (e.state && e.state.view === 'editor' && e.state.noteId) {
@@ -1534,22 +1844,22 @@ _underlined_ → underlined
                     document.getElementById('sidebar').classList.add('hidden');
                     document.getElementById('editorContainer').classList.add('active');
                     document.getElementById('fab').classList.add('hidden');
-                    
+
                     document.getElementById('noteTitle').value = currentNote.title;
                     const noteContent = document.getElementById('noteContent');
-                    
+
                     // Direct HTML injection
                     noteContent.innerHTML = currentNote.content;
-                    
+
                     document.getElementById('pinBtn').classList.toggle('active', currentNote.isPinned);
-                    
+
                     updateCharCount();
                     updateLastSaved();
                 }
             }
         });
 
-        window.addEventListener('beforeunload', function() {
+        window.addEventListener('beforeunload', function () {
             if (currentNote) {
                 currentNote.updatedAt = new Date().toISOString();
                 saveNotes();
@@ -1557,4 +1867,5 @@ _underlined_ → underlined
         });
     </script>
 </body>
+
 </html>
